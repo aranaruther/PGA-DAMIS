@@ -89,6 +89,9 @@ if (process.env.NODE_ENV !== 'production') {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// ── Trust Railway's reverse proxy ────────────────────
+app.set('trust proxy', 1);
+
 // ── Sessions ──────────────────────────────────────────
 app.use(session({
   secret: process.env.SESSION_SECRET || 'fallback-dev-secret',
