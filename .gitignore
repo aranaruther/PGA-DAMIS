@@ -1,0 +1,26 @@
+# ── Secrets ─────────────────
+.env
+
+# ── Dependencies ─────────────
+node_modules/
+
+# ── Database ─────────────────
+*.db
+*.db-shm
+*.db-wal
+
+# ── Uploads (local dev) ──────
+public/uploads/
+
+# ── Logs ─────────────────────
+*.log
+npm-debug.log*
+
+# ── OS ───────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Editor ───────────────────
+.vscode/
+.idea/
+*.swp

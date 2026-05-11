@@ -1,0 +1,464 @@
+/**
+ * routes/users.js
+ *
+ * GET  /api/users/me              — logged-in user's own profile
+ * PUT  /api/users/me              — update own profile
+ * PUT  /api/users/me/avatar       — change avatar (Cloudinary)
+ * PUT  /api/users/me/cover        — change cover photo (Cloudinary)
+ * GET  /api/users/search?q=...    — search users
+ * GET  /api/users/suggested       — suggested people to follow
+ * GET  /api/users/:username       — any user's public profile
+ * GET  /api/users/:username/posts — a user's posts
+ * POST /api/users/:id/follow      — follow / unfollow toggle
+ */
+
+const express = require('express');
+const router  = express.Router();
+
+const { requireAuth } = require('../middleware/auth');
+const { uploadAvatar, uploadCover, uploadIdDocs } = require('../middleware/upload');
+const {
+  findUserById, findUserByUsername, updateUser, getUserPosts,
+  toggleFollow, isFollowing, getFollowerCount, getFollowingCount,
+  getSuggestedUsers, searchUsers,
+  createNotification,
+  submitIdVerification,
+  sendFollowRequest, acceptFollowRequest, declineFollowRequest,
+  cancelFollowRequest, getPendingFollowRequests, getFollowRequestStatus,
+  sendFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend,
+  getFriendshipStatus, areFriends, getPendingFriendRequests, getOutgoingFriendRequests, getFriendCount,
+  db, setBillComment,
+  getReputationScore, getMyRepVote, setRepVote,
+  createUserReport,
+  createMaintenanceRequest, getMaintenanceRequests,
+} = require('../utils/db');
+
+const log = require('../utils/logger');
+
+function publicProfile(user, extras = {}) {
+  return {
+    id:               user.id,
+    firstName:        user.firstName,
+    middleName:       user.middleName  || '',
+    lastName:         user.lastName,
+    suffix:           user.suffix      || '',
+    username:         user.username,
+    avatar:           user.avatar      || '',
+    coverPhoto:       user.coverPhoto  || '',
+    bio:              user.bio         || '',
+    location:         user.location    || '',
+    permanentAddress: user.permanentAddress || '',
+    course:           user.course      || '',
+    yearLevel:        user.yearLevel   || '',
+    idVerified:       user.idVerified,
+    createdAt:        user.createdAt,
+    ...extras,
+  };
+}
+
+// ════════════════════════════════════════════════════
+// GET SELF
+// ════════════════════════════════════════════════════
+router.get('/api/users/me', requireAuth, (req, res) => {
+  const user = findUserById(req.user.id);
+  if (!user) return res.status(404).json({ error: 'User not found.' });
+  res.json({
+    user: {
+      ...publicProfile(user),
+      email:       user.email,
+      phone:       user.phone,
+      birthday:    user.birthday,
+      sex:         user.sex,
+      authProvider: user.authProvider,
+      role:        user.role,
+      followerCount:  getFollowerCount(user.id),
+      followingCount: getFollowingCount(user.id),
+    }
+  });
+});
+
+// ════════════════════════════════════════════════════
+// UPDATE PROFILE
+// ════════════════════════════════════════════════════
+router.put('/api/users/me', requireAuth, (req, res) => {
+  // Only bio is user-editable; name and address are set at registration
+  const fields = {};
+  if (req.body.bio !== undefined) fields.bio = String(req.body.bio).slice(0, 160);
+  if (!Object.keys(fields).length) return res.status(400).json({ error: 'No editable fields provided.' });
+  updateUser(req.user.id, fields);
+  const updated = findUserById(req.user.id);
+  log.info(`Profile updated by @${req.user.username} — fields: ${Object.keys(fields).join(', ')}`);
+  res.json({ user: publicProfile(updated) });
+});
+
+// ════════════════════════════════════════════════════
+// CHANGE AVATAR
+// ════════════════════════════════════════════════════
+router.put('/api/users/me/avatar', requireAuth, ...uploadAvatar, (req, res) => {
+  if (!req.cloudinaryUrl) return res.status(400).json({ error: 'No image provided.' });
+  updateUser(req.user.id, { avatar: req.cloudinaryUrl });
+  res.json({ avatar: req.cloudinaryUrl });
+});
+
+// ════════════════════════════════════════════════════
+// CHANGE COVER PHOTO
+// ════════════════════════════════════════════════════
+router.put('/api/users/me/cover', requireAuth, ...uploadCover, (req, res) => {
+  if (!req.cloudinaryUrl) return res.status(400).json({ error: 'No image provided.' });
+  updateUser(req.user.id, { coverPhoto: req.cloudinaryUrl });
+  res.json({ coverPhoto: req.cloudinaryUrl });
+});
+
+// ════════════════════════════════════════════════════
+// SEARCH
+// ════════════════════════════════════════════════════
+router.get('/api/users/search', (req, res) => {
+  const { q } = req.query;
+  if (!q?.trim()) return res.json({ users: [] });
+  const viewerId = req.isAuthenticated() ? req.user.id : null;
+  const results  = searchUsers(q.trim(), viewerId);
+  res.json({ users: results });
+});
+
+// ════════════════════════════════════════════════════
+// SUGGESTED USERS
+// ════════════════════════════════════════════════════
+router.get('/api/users/suggested', requireAuth, (req, res) => {
+  const users = getSuggestedUsers(req.user.id, 6);
+  res.json({ users });
+});
+
+// ════════════════════════════════════════════════════
+// LITERAL routes that must precede /:username wildcard
+// ════════════════════════════════════════════════════
+router.get('/api/users/friend-requests', requireAuth, (req, res) => {
+  const incoming = getPendingFriendRequests(req.user.id);
+  const outgoing = getOutgoingFriendRequests(req.user.id);
+  log.info(`Friend requests for @${req.user.username}: ${incoming.length} incoming, ${outgoing.length} outgoing`);
+  res.json({ requests: incoming, outgoing });
+});
+router.get('/api/users/follow-requests', requireAuth, (req, res) => {
+  res.json({ requests: getPendingFriendRequests(req.user.id) });
+});
+
+// PUBLIC PROFILE  (must be after /me, /search, /suggested)
+// ════════════════════════════════════════════════════
+router.get('/api/users/:username', (req, res) => {
+  const user = findUserByUsername(req.params.username);
+  if (!user) return res.status(404).json({ error: 'User not found.' });
+
+  if (user.accountStatus !== 'approved') {
+    return res.status(404).json({ error: 'User not found.' });
+  }
+
+  const viewerId = req.isAuthenticated() ? req.user.id : null;
+  const reputationScore = getReputationScore(user.id);
+  const myVote          = viewerId ? getMyRepVote(viewerId, user.id) : 0;
+
+  res.json({
+    user: publicProfile(user, {
+      followerCount:       getFollowerCount(user.id),
+      followingCount:      getFollowingCount(user.id),
+      isFollowing:         viewerId ? isFollowing(viewerId, user.id) : false,
+      followRequestStatus: viewerId ? getFollowRequestStatus(viewerId, user.id) : null,
+      friendshipStatus:    viewerId ? getFriendshipStatus(viewerId, user.id) : null,
+      areFriends:          viewerId ? areFriends(viewerId, user.id) : false,
+      friendCount:         getFriendCount(user.id),
+      reputationScore,
+      myVote,
+    })
+  });
+});
+
+// ════════════════════════════════════════════════════
+// USER'S POSTS
+// ════════════════════════════════════════════════════
+router.get('/api/users/:username/posts', (req, res) => {
+  const user = findUserByUsername(req.params.username);
+  if (!user || user.accountStatus !== 'approved') return res.status(404).json({ error: 'User not found.' });
+  const page     = parseInt(req.query.page)  || 1;
+  const limit    = parseInt(req.query.limit) || 10;
+  const viewerId = req.isAuthenticated() ? req.user.id : null;
+  const posts    = getUserPosts({ userId: user.id, viewerId, page, limit });
+  res.json({ posts, page, hasMore: posts.length === limit });
+});
+
+// ════════════════════════════════════════════════════
+// FOLLOW / UNFOLLOW / FOLLOW REQUESTS
+// ════════════════════════════════════════════════════
+
+// POST /api/users/:id/friend — send friend request
+router.post('/api/users/:id/friend', requireAuth, (req, res) => {
+  const targetId = req.params.id;
+  if (targetId === req.user.id) return res.status(400).json({ error: 'Cannot friend yourself.' });
+  const target = findUserById(targetId);
+  if (!target) return res.status(404).json({ error: 'User not found.' });
+
+  const result = sendFriendRequest(req.user.id, targetId);
+  if (!result.existing) {
+    log.friend(`@${req.user.username} → @${target.username} (sent)`);
+    createNotification({
+      userId: targetId, type: 'friend_request', actorId: req.user.id,
+      targetId: req.user.id, message: `${req.user.firstName} sent you a friend request`,
+    });
+    const io = req.app.get('io');
+    if (io) io.to(`user:${targetId}`).emit('new-notification', { userId: targetId });
+  } else {
+    log.friend(`@${req.user.username} → @${target.username} (already ${result.status})`);
+  }
+  res.json({ status: result.status, friendshipStatus: getFriendshipStatus(req.user.id, targetId) });
+});
+
+// POST /api/users/:id/friend/accept — accept friend request
+router.post('/api/users/:id/friend/accept', requireAuth, (req, res) => {
+  acceptFriendRequest(req.params.id, req.user.id);
+  const fc = getFriendCount(req.user.id);
+  log.friend(`✅ @${req.user.username} accepted from user ${req.params.id} | friends: ${fc}`);
+  // Mark the friend_request notification from this actor as read so it doesn't re-show
+  db.prepare("UPDATE notifications SET is_read=1 WHERE user_id=? AND type='friend_request' AND actor_id=?").run(req.user.id, req.params.id);
+  createNotification({
+    userId: req.params.id, type: 'friend_accept', actorId: req.user.id,
+    targetId: req.user.id, message: `${req.user.firstName} accepted your friend request`,
+  });
+  const io = req.app.get('io');
+  if (io) io.to(`user:${req.params.id}`).emit('new-notification', { userId: req.params.id });
+  res.json({ success: true, areFriends: true, friendCount: fc });
+});
+
+// POST /api/users/:id/friend/decline — decline friend request
+router.post('/api/users/:id/friend/decline', requireAuth, (req, res) => {
+  declineFriendRequest(req.params.id, req.user.id);
+  db.prepare("UPDATE notifications SET is_read=1 WHERE user_id=? AND type='friend_request' AND actor_id=?").run(req.user.id, req.params.id);
+  res.json({ success: true });
+});
+
+// DELETE /api/users/:id/friend — unfriend or cancel request
+router.delete('/api/users/:id/friend', requireAuth, (req, res) => {
+  removeFriend(req.user.id, req.params.id);
+  // Cancel: mark the friend_request notification on THEIR side as read
+  // so they no longer see Accept/Decline buttons
+  db.prepare("UPDATE notifications SET is_read=1 WHERE user_id=? AND type='friend_request' AND actor_id=?")
+    .run(req.params.id, req.user.id);
+  // Also clean up any notification WE received from them (in case of mutual)
+  db.prepare("UPDATE notifications SET is_read=1 WHERE user_id=? AND type='friend_request' AND actor_id=?")
+    .run(req.user.id, req.params.id);
+  log.friend(`@${req.user.username} cancelled/unfriended user ${req.params.id}`);
+  res.json({ success: true, areFriends: false });
+});
+
+// ════════════════════════════════════════════════════
+// VERIFICATION STATUS (own account)
+// ════════════════════════════════════════════════════
+router.get('/api/users/me/verification-status', requireAuth, (req, res) => {
+  const latest = db.prepare(
+    `SELECT status, created_at, reviewed_at, admin_notes FROM id_verification_requests
+     WHERE user_id = ? ORDER BY created_at DESC LIMIT 1`
+  ).get(req.user.id);
+  res.json({ status: latest?.status || null, request: latest || null });
+});
+
+// ════════════════════════════════════════════════════
+// ID VERIFICATION SUBMISSION (with file upload)
+// ════════════════════════════════════════════════════
+router.post('/api/users/me/submit-verification', requireAuth, ...uploadIdDocs, async (req, res) => {
+  try {
+    const urls = req.idDocUrls || {};
+    // Also accept raw URLs (e.g. already-uploaded Cloudinary URLs)
+    const idFrontUrl = urls.id_front || req.body.idFrontUrl || '';
+    const idBackUrl  = urls.id_back  || req.body.idBackUrl  || '';
+    const selfieUrl  = urls.selfie   || req.body.selfieUrl  || '';
+    const idType     = req.body.idType || 'national_id';
+
+    if (!idFrontUrl) return res.status(400).json({ error: 'ID front photo is required.' });
+
+    const reqId = submitIdVerification({
+      userId: req.user.id,
+      idFrontUrl,
+      idBackUrl,
+      selfieUrl,
+      idType,
+    });
+    res.json({ success: true, requestId: reqId, message: 'Verification request submitted. An admin will review it shortly.' });
+  } catch (err) {
+    console.error('submit-verification error:', err);
+    res.status(500).json({ error: 'Failed to submit verification request.' });
+  }
+});
+
+// POST /api/users/:id/follow-only — follow without friending
+router.post('/api/users/:id/follow-only', requireAuth, (req, res) => {
+  const targetId = req.params.id;
+  if (targetId === req.user.id) return res.status(400).json({ error: 'Cannot follow yourself.' });
+  const target = findUserById(targetId);
+  if (!target) return res.status(404).json({ error: 'User not found.' });
+  // If already following, unfollow
+  if (isFollowing(req.user.id, targetId)) {
+    toggleFollow(req.user.id, targetId);
+    return res.json({ following: false, followerCount: getFollowerCount(targetId) });
+  }
+  // Follow them
+  toggleFollow(req.user.id, targetId);
+  if (req.user.id !== targetId) {
+    createNotification({ userId: targetId, type: 'follow', actorId: req.user.id, targetId: req.user.id, message: `${req.user.firstName} started following you` });
+    const io = req.app.get('io');
+    if (io) io.to(`user:${targetId}`).emit('new-notification', { userId: targetId });
+  }
+  res.json({ following: true, followerCount: getFollowerCount(targetId) });
+});
+
+// DELETE /api/users/:id/follow-only — unfollow
+router.delete('/api/users/:id/follow-only', requireAuth, (req, res) => {
+  if (isFollowing(req.user.id, req.params.id)) toggleFollow(req.user.id, req.params.id);
+  res.json({ following: false, followerCount: getFollowerCount(req.params.id) });
+});
+
+// GET /api/users/me/dormitory — current user's bed assignment + billing
+router.get('/api/users/me/dormitory', requireAuth, (req, res) => {
+  try {
+    const assignment = db.prepare(
+      'SELECT ba.bed_number, ba.assigned_at, ba.notes, ' +
+      'dr.room_number, dr.gender, dr.capacity ' +
+      'FROM bed_assignments ba ' +
+      'JOIN dorm_rooms dr ON dr.id = ba.room_id ' +
+      'WHERE ba.user_id = ?'
+    ).get(req.user.id);
+
+    // Full billing history with paid_at and notes
+    const billing = db.prepare(
+      'SELECT id, status, month, amount, paid_at, notes, user_comment FROM dorm_billing WHERE user_id=? ORDER BY month DESC LIMIT 12'
+    ).all(req.user.id);
+
+    const hasBills = billing.length > 0;
+    const unpaidCount = billing.filter(b => b.status === 'unpaid' || b.status === 'overdue').length;
+
+    if (!assignment) {
+      return res.json({ assigned: false, billing, hasBills, unpaidCount });
+    }
+    res.json({
+      assigned: true,
+      roomNumber: assignment.room_number,
+      bedNumber: assignment.bed_number,
+      gender: assignment.gender,
+      assignedAt: assignment.assigned_at,
+      notes: assignment.notes,
+      billing,
+      hasBills,
+      unpaidCount,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/users/dormitory/residents — all assigned residents (visible to authenticated users)
+router.get('/api/users/dormitory/residents', requireAuth, (req, res) => {
+  try {
+    const residents = db.prepare(`
+      SELECT u.id, u.first_name, u.last_name, u.username, u.avatar, u.course, u.year_level, u.sex,
+             dr.room_number, dr.gender as room_gender,
+             ba.bed_number, ba.assigned_at
+      FROM bed_assignments ba
+      JOIN users u ON u.id = ba.user_id
+      JOIN dorm_rooms dr ON dr.id = ba.room_id
+      WHERE u.is_active = 1
+      ORDER BY dr.room_number, ba.bed_number
+    `).all();
+    res.json({ residents });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PUT /api/users/me/billing/:billId/comment — resident adds/updates a dispute note
+router.put('/api/users/me/billing/:billId/comment', requireAuth, (req, res) => {
+  try {
+    const { comment } = req.body;
+    if (comment === undefined) return res.status(400).json({ error: 'comment is required' });
+    const result = setBillComment(req.params.billId, req.user.id, comment);
+    if (!result.changes) return res.status(404).json({ error: 'Bill not found or does not belong to you' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ════════════════════════════════════════════════════
+// REPUTATION VOTING   POST /api/users/:username/reputation
+// Body: { value: 1 | -1 }   Anonymous to the target.
+// ════════════════════════════════════════════════════
+router.post('/api/users/:username/reputation', requireAuth, (req, res) => {
+  const target = findUserByUsername(req.params.username);
+  if (!target || target.accountStatus !== 'approved') return res.status(404).json({ error: 'User not found.' });
+  if (target.id === req.user.id) return res.status(400).json({ error: 'You cannot vote on your own reputation.' });
+
+  const value = parseInt(req.body.value, 10);
+  if (![1, -1].includes(value)) return res.status(400).json({ error: 'value must be 1 or -1.' });
+
+  const result = setRepVote(req.user.id, target.id, value);
+
+  // Notify target anonymously (no actor name exposed in message)
+  const action = result.action; // 'added', 'removed', 'changed'
+  if (action !== 'removed') {
+    const label = value === 1 ? 'a positive' : 'a negative';
+    createNotification({
+      userId:  target.id,
+      type:    'reputation',
+      actorId: req.user.id,   // stored in DB but not shown in UI message
+      message: `Someone gave you ${label} reputation point.`,
+    });
+    const io = req.app.get('io');
+    if (io) io.to(`user:${target.id}`).emit('new-notification', { userId: target.id });
+  }
+
+  log.info(`Reputation vote: @${req.user.username} → @${target.username} (${value > 0 ? '+' : ''}${value}) [${action}]`);
+  res.json({ success: true, action, score: getReputationScore(target.id), myVote: getMyRepVote(req.user.id, target.id) });
+});
+
+// ════════════════════════════════════════════════════
+// REPORT USER   POST /api/users/:username/report
+// Body: { reason, details }   Anonymous.
+// ════════════════════════════════════════════════════
+router.post('/api/users/:username/report', requireAuth, (req, res) => {
+  const target = findUserByUsername(req.params.username);
+  if (!target || target.accountStatus !== 'approved') return res.status(404).json({ error: 'User not found.' });
+  if (target.id === req.user.id) return res.status(400).json({ error: 'You cannot report yourself.' });
+
+  const { reason, details } = req.body;
+  if (!reason?.trim()) return res.status(400).json({ error: 'A reason is required.' });
+
+  createUserReport({ reporterId: req.user.id, targetId: target.id, reason: reason.trim(), details: details?.trim() || '' });
+
+  log.info(`User report: @${req.user.username} reported @${target.username} — reason: "${reason}"`);
+  res.json({ success: true, message: 'Report submitted. Thank you for helping keep the community safe.' });
+});
+
+// ── Maintenance Requests (user side) ──────────────────────────────────────────
+
+// Submit a new maintenance request
+router.post('/api/maintenance/requests', requireAuth, (req, res) => {
+  const { category, title, description, location, priority } = req.body;
+  if (!title?.trim() || !description?.trim()) return res.status(400).json({ error: 'Title and description are required.' });
+  try {
+    const id = createMaintenanceRequest({
+      userId: req.user.id,
+      category: category || 'general',
+      title: title.trim(),
+      description: description.trim(),
+      location: location?.trim() || '',
+      priority: priority || 'normal',
+    });
+    log.info(`Maintenance request submitted by @${req.user.username}: "${title.trim()}" [${category}]`);
+    res.json({ success: true, id });
+  } catch (e) {
+    log.error('createMaintenanceRequest error:', e.message);
+    res.status(500).json({ error: 'Failed to submit request.' });
+  }
+});
+
+// Get own maintenance requests
+router.get('/api/maintenance/requests/mine', requireAuth, (req, res) => {
+  const { status } = req.query;
+  const requests = getMaintenanceRequests({ userId: req.user.id, status: status || 'all' });
+  res.json(requests);
+});
+
+
+module.exports = router;

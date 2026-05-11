@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>PGA-DAMIS — Profile</title>
+  <link rel="manifest" href="/manifest.json"/><meta name="theme-color" content="#0070e0"/>
+  <script>if(localStorage.getItem('ch-dark')==='true')document.documentElement.classList.add('dark');</script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/relativeTime.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <link rel="stylesheet" href="/css/app.css"/>
+  <script>tailwind.config={darkMode:'class',theme:{extend:{fontFamily:{display:['Sora','sans-serif'],sans:['DM Sans','sans-serif']},colors:{brand:{50:'#eef6ff',100:'#d9ecff',400:'#4da6ff',500:'#1a8cff',600:'#0070e0',700:'#005bb5'}}}}}</script>
+  <style>
+    #cover-wrap{height:240px;overflow:hidden;position:relative;background:linear-gradient(135deg,#0070e0,#4da6ff);}
+    #cover-wrap img{width:100%;height:100%;object-fit:cover;}
+    #profile-avatar-wrap{margin-top:-52px;padding-left:24px;}
+    #profile-avatar{border:4px solid var(--surface);box-shadow:0 4px 20px rgba(0,0,0,.15);}
+    .tab-btn{transition:all .15s;border-bottom:2px solid transparent;}
+    .tab-btn.active{border-bottom-color:#0070e0;color:#0070e0;font-weight:600;}
+    html.dark .tab-btn.active{border-bottom-color:#58a6ff;color:#58a6ff;}
+    @media(max-width:640px){#cover-wrap{height:160px;}#profile-avatar-wrap{margin-top:-40px;}}
+    .reaction-bar{position:absolute;bottom:calc(100% + 6px);left:0;background:#fff;border-radius:999px;padding:6px 10px;display:flex;gap:4px;box-shadow:0 8px 32px rgba(0,0,0,.18);border:1px solid #e2e8f0;z-index:50;animation:reactionPop .15s ease;white-space:nowrap;}
+    .reaction-bar button{font-size:22px;background:none;border:none;cursor:pointer;transition:transform .12s;line-height:1;padding:0 2px;}
+    .reaction-bar button:hover{transform:scale(1.38) translateY(-5px);}
+    @keyframes reactionPop{from{opacity:0;transform:scale(.8) translateY(4px)}to{opacity:1;transform:scale(1)}}
+    .reaction-chip{font-size:11px;background:#f1f5f9;border-radius:20px;padding:2px 8px;cursor:pointer;border:none;display:inline-flex;align-items:center;gap:3px;}
+    html.dark .reaction-bar{background:#1e293b;border-color:#334155;}
+    html.dark .reaction-chip{background:#334155;color:#e2e8f0;}
+  </style>
+</head>
+<body class="h-full">
+
+<!-- NAVBAR -->
+<nav id="navbar" class="px-4 flex items-center justify-between gap-3">
+  <a href="/feed.html" class="flex items-center gap-2 font-display font-bold text-lg text-slate-800 dark:text-slate-100 flex-shrink-0">
+    <div class="w-8 h-8 rounded-xl bg-brand-600 flex items-center justify-center"><i class="fa-solid fa-people-group text-white text-sm"></i></div>
+    <span class="hidden sm:inline">PGA-DAMIS</span>
+  </a>
+  <div class="flex-1 max-w-xs hidden md:flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl px-3 py-2 gap-2">
+    <i class="fa-solid fa-magnifying-glass text-slate-400 text-sm"></i>
+    <input id="nav-search" type="text" placeholder="Search..." class="bg-transparent text-sm outline-none w-full text-slate-700 dark:text-slate-200 placeholder-slate-400"/>
+  </div>
+  <div class="flex items-center gap-2">
+    <a href="/messages.html" class="relative w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 flex items-center justify-center transition-colors">
+      <i class="fa-regular fa-comment-dots text-slate-600 dark:text-slate-300 text-sm"></i><span id="msg-badge" class="notif-badge hidden">0</span>
+    </a>
+    <a href="/notifications.html" class="relative w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 flex items-center justify-center transition-colors">
+      <i class="fa-solid fa-bell text-slate-600 dark:text-slate-300 text-sm"></i><span id="notif-badge" class="notif-badge hidden">0</span>
+    </a>
+    <button onclick="toggleDark()" class="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 flex items-center justify-center transition-colors">
+      <i id="dark-icon" class="fa-solid fa-moon text-slate-500 dark:text-yellow-400 text-sm"></i>
+    </button>
+    <div class="relative" id="avatar-menu-wrap">
+      <button onclick="toggleAvatarMenu()" class="w-9 h-9 rounded-xl overflow-hidden border-2 border-slate-200 dark:border-slate-700 hover:border-brand-500 transition-colors">
+        <img id="nav-avatar" src="" alt="me" class="w-full h-full object-cover" onerror="this.src='https://ui-avatars.com/api/?name=U&background=1a8cff&color=fff'"/>
+      </button>
+      <div id="avatar-dropdown" class="hidden absolute right-0 top-12 w-56 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 py-2 z-50">
+        <div id="dropdown-name" class="px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 border-b border-slate-100 dark:border-slate-700 mb-1"></div>
+        <a href="#" onclick="goProfile()" class="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg mx-1"><i class="fa-solid fa-user w-4 text-brand-500"></i> My Profile</a>
+        <a href="/feed.html" class="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg mx-1"><i class="fa-solid fa-house w-4 text-slate-400"></i> Home</a>
+        <a id="admin-nav-link" href="/admin.html" class="hidden items-center gap-3 px-4 py-2.5 text-sm text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950 rounded-lg mx-1"><i class="fa-solid fa-shield-halved w-4"></i> Admin Panel</a>
+        <div class="border-t border-slate-100 dark:border-slate-700 mt-1 pt-1 mx-1">
+          <button onclick="logout()" class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg"><i class="fa-solid fa-right-from-bracket w-4"></i> Log out</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="pt-[60px]">
+  <!-- COVER -->
+  <div id="cover-wrap" class="relative">
+    <img id="cover-img" src="" alt="cover" class="hidden"/>
+    <div id="cover-placeholder"></div>
+    <label id="cover-edit-btn" for="cover-input" class="hidden absolute bottom-3 right-4 cursor-pointer bg-black/40 hover:bg-black/60 text-white text-xs font-medium px-3 py-1.5 rounded-lg flex items-center gap-1.5 backdrop-blur-sm transition-colors">
+      <i class="fa-solid fa-camera text-xs"></i>Edit cover
+    </label>
+    <input type="file" id="cover-input" accept="image/*" class="hidden" onchange="uploadCover(event)"/>
+  </div>
+
+  <div class="max-w-4xl mx-auto px-4">
+    <!-- Avatar row -->
+    <div id="profile-avatar-wrap" class="flex items-end justify-between pb-3 flex-wrap gap-3">
+      <div class="relative flex-shrink-0">
+        <img id="profile-avatar" src="" alt="avatar" class="w-28 h-28 rounded-full object-cover bg-slate-200 dark:bg-slate-700"/>
+        <label id="avatar-edit-btn" for="avatar-input" class="hidden absolute bottom-1 right-1 w-8 h-8 rounded-full bg-white dark:bg-slate-700 border-2 border-slate-100 dark:border-slate-600 cursor-pointer hover:bg-slate-50 flex items-center justify-center shadow-md">
+          <i class="fa-solid fa-camera text-slate-500 text-xs"></i>
+        </label>
+        <input type="file" id="avatar-input" accept="image/*" class="hidden" onchange="uploadAvatar(event)"/>
+      </div>
+      <div class="flex gap-2 mb-1 flex-wrap">
+        <button id="edit-profile-btn" onclick="openEditModal()" class="hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 text-slate-700 dark:text-slate-200 text-sm font-semibold px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
+          <i class="fa-solid fa-pen text-xs"></i>Edit Profile
+        </button>
+        <div id="own-rep-badge" class="hidden items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2"></div>
+        <button id="follow-btn" onclick="toggleFollow()" class="hidden text-sm font-semibold px-5 py-2 rounded-xl transition-colors">Add Friend</button>
+        <button id="follow-only-btn" class="hidden text-sm font-semibold px-4 py-2 rounded-xl transition-colors">Follow</button>
+        <button id="message-btn" class="hidden bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold px-4 py-2 rounded-xl flex items-center gap-2 transition-colors">
+          <i class="fa-regular fa-comment-dots"></i>Message
+        </button>
+        <!-- Reputation vote buttons (other users only) -->
+        <div id="reputation-actions" class="hidden items-center gap-1.5">
+          <button id="rep-upvote-btn" onclick="castRepVote(1)" title="Give +1 reputation" class="w-8 h-8 rounded-xl border-2 border-slate-200 dark:border-slate-700 hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-950/40 flex items-center justify-center transition-colors text-slate-400 hover:text-green-600">
+            <i class="fa-solid fa-thumbs-up text-xs"></i>
+          </button>
+          <span id="rep-score" class="text-sm font-bold text-slate-500 dark:text-slate-400 min-w-[2ch] text-center">0</span>
+          <button id="rep-downvote-btn" onclick="castRepVote(-1)" title="Give -1 reputation" class="w-8 h-8 rounded-xl border-2 border-slate-200 dark:border-slate-700 hover:border-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 flex items-center justify-center transition-colors text-slate-400 hover:text-red-500">
+            <i class="fa-solid fa-thumbs-down text-xs"></i>
+          </button>
+        </div>
+        <!-- Report button (other users only) -->
+        <button id="report-user-btn" onclick="openReportModal()" class="hidden bg-white dark:bg-slate-800 border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-950/40 text-red-500 text-sm font-semibold px-3 py-2 rounded-xl flex items-center gap-1.5 transition-colors" title="Report this user">
+          <i class="fa-solid fa-flag text-xs"></i>Report
+        </button>
+      </div>
+    </div>
+
+    <!-- Bio info -->
+    <div class="pb-3">
+      <div class="flex items-center gap-2 flex-wrap">
+        <h1 id="profile-name" class="font-display font-bold text-2xl text-slate-900 dark:text-slate-100"></h1>
+        <i id="verified-badge" class="fa-solid fa-circle-check text-brand-500 text-xl hidden"></i>
+      </div>
+      <p id="profile-handle" class="text-slate-400 text-sm mt-0.5"></p>
+      <p id="profile-bio" class="text-slate-700 dark:text-slate-300 text-sm mt-2 max-w-lg leading-relaxed"></p>
+      <div id="profile-meta" class="flex flex-wrap gap-4 mt-2 text-sm text-slate-500 dark:text-slate-400"></div>
+      <div class="flex gap-5 mt-4">
+        <div><span id="post-count" class="font-display font-bold text-xl text-slate-900 dark:text-slate-100">0</span><span class="text-slate-400 text-sm ml-1.5">Posts</span></div>
+        <div><span id="follower-count" class="font-display font-bold text-xl text-slate-900 dark:text-slate-100">0</span><span class="text-slate-400 text-sm ml-1.5">Friends</span></div>
+        <div><span id="following-count" class="font-display font-bold text-xl text-slate-900 dark:text-slate-100">0</span><span class="text-slate-400 text-sm ml-1.5">Followers</span></div>
+        <div><span id="followingout-count" class="font-display font-bold text-xl text-slate-900 dark:text-slate-100">0</span><span class="text-slate-400 text-sm ml-1.5">Following</span></div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex border-b border-slate-200 dark:border-slate-800">
+      <button class="tab-btn active px-5 py-3 text-sm text-slate-600 dark:text-slate-300" onclick="switchTab('posts',this)">Posts</button>
+      <button class="tab-btn px-5 py-3 text-sm text-slate-500 dark:text-slate-400" onclick="switchTab('about',this)">About</button>
+      <button id="verify-tab-btn" class="tab-btn hidden px-5 py-3 text-sm text-slate-500 dark:text-slate-400" onclick="switchTab('verify',this)"><i class="fa-solid fa-id-card mr-1"></i>Verify ID</button>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="max-w-4xl mx-auto px-4 pt-6 pb-28 md:pb-8">
+    <div class="flex gap-6">
+      <div class="flex-1 min-w-0">
+        <!-- Posts tab -->
+        <div id="posts-tab">
+          <div id="posts-container" class="space-y-4">
+            <div class="post-card p-4 space-y-3"><div class="flex gap-3 items-center"><div class="skeleton w-10 h-10 rounded-full flex-shrink-0"></div><div class="flex-1 space-y-2"><div class="skeleton h-3 w-1/3"></div><div class="skeleton h-2 w-1/4"></div></div></div><div class="skeleton h-3 w-full"></div><div class="skeleton h-3 w-4/5"></div></div>
+          </div>
+          <div id="feed-footer" class="hidden text-center py-4 mt-2">
+            <button id="load-more-btn" onclick="loadMorePosts()" class="text-sm text-brand-600 font-semibold hover:underline">Load more</button>
+            <p id="feed-end-msg" class="text-sm text-slate-400 hidden">No more posts</p>
+          </div>
+        </div>
+        <!-- About tab -->
+        <div id="about-tab" class="hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-6">
+          <h3 class="font-display font-semibold text-slate-800 dark:text-slate-100 mb-4">About</h3>
+          <div id="about-content" class="space-y-3 text-sm text-slate-600 dark:text-slate-300"></div>
+        </div>
+
+        <!-- Verify ID tab (own profile only) -->
+        <div id="verify-tab" class="hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-6">
+          <div class="flex items-center gap-3 mb-5">
+            <div class="w-10 h-10 rounded-xl bg-brand-100 dark:bg-brand-900/30 flex items-center justify-center flex-shrink-0">
+              <i class="fa-solid fa-id-card text-brand-600 dark:text-brand-400"></i>
+            </div>
+            <div>
+              <h3 class="font-display font-semibold text-slate-800 dark:text-slate-100">ID Verification</h3>
+              <p class="text-xs text-slate-400">Upload a valid government ID to get your verified badge</p>
+            </div>
+          </div>
+
+          <div id="verif-already-verified" class="hidden bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4 mb-4 flex items-center gap-3">
+            <i class="fa-solid fa-circle-check text-green-500 text-lg"></i>
+            <div><p class="text-sm font-semibold text-green-700 dark:text-green-400">Your account is verified!</p><p class="text-xs text-green-600 dark:text-green-500">You have the verified badge on your profile.</p></div>
+          </div>
+          <div id="verif-pending-notice" class="hidden bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 mb-4 flex items-center gap-3">
+            <i class="fa-solid fa-clock text-amber-500 text-lg"></i>
+            <div><p class="text-sm font-semibold text-amber-700 dark:text-amber-400">Verification pending review</p><p class="text-xs text-amber-600 dark:text-amber-500">Our team will review your ID within 24 hours.</p></div>
+          </div>
+
+          <div id="verif-form">
+            <div class="space-y-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">ID Type</label>
+                <select id="verif-id-type" class="w-full bg-slate-50 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-slate-100 outline-none border border-transparent focus:border-brand-400">
+                  <option value="national_id">PhilSys National ID</option>
+                  <option value="passport">Philippine Passport</option>
+                  <option value="drivers_license">Driver's License</option>
+                  <option value="postal_id">Postal ID</option>
+                  <option value="voters_id">Voter's ID</option>
+                  <option value="umid">UMID / SSS / GSIS</option>
+                  <option value="prc">PRC ID</option>
+                </select>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Front of ID <span class="text-red-500">*</span></label>
+                  <label for="verif-front-input" class="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-4 cursor-pointer hover:border-brand-400 transition-colors">
+                    <div id="verif-front-preview-wrap" class="hidden w-full"><img id="verif-front-preview" class="w-full h-24 object-cover rounded-lg"/></div>
+                    <div id="verif-front-placeholder" class="flex flex-col items-center gap-1">
+                      <i class="fa-solid fa-camera text-slate-300 text-2xl"></i>
+                      <span class="text-xs text-slate-400">Click to upload front</span>
+                    </div>
+                  </label>
+                  <input type="file" id="verif-front-input" accept="image/*" class="hidden" onchange="previewVerifFile('front', this)"/>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Back of ID <span class="text-slate-400 font-normal">(optional)</span></label>
+                  <label for="verif-back-input" class="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-4 cursor-pointer hover:border-brand-400 transition-colors">
+                    <div id="verif-back-preview-wrap" class="hidden w-full"><img id="verif-back-preview" class="w-full h-24 object-cover rounded-lg"/></div>
+                    <div id="verif-back-placeholder" class="flex flex-col items-center gap-1">
+                      <i class="fa-solid fa-camera text-slate-300 text-2xl"></i>
+                      <span class="text-xs text-slate-400">Click to upload back</span>
+                    </div>
+                  </label>
+                  <input type="file" id="verif-back-input" accept="image/*" class="hidden" onchange="previewVerifFile('back', this)"/>
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Selfie with ID <span class="text-slate-400 font-normal">(optional but recommended)</span></label>
+                <label for="verif-selfie-input" class="flex items-center gap-3 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-4 cursor-pointer hover:border-brand-400 transition-colors">
+                  <div id="verif-selfie-preview-wrap" class="hidden"><img id="verif-selfie-preview" class="w-16 h-16 object-cover rounded-lg"/></div>
+                  <div id="verif-selfie-placeholder" class="flex items-center gap-3">
+                    <i class="fa-solid fa-user-circle text-slate-300 text-2xl"></i>
+                    <span class="text-xs text-slate-400">Selfie holding your ID beside your face</span>
+                  </div>
+                </label>
+                <input type="file" id="verif-selfie-input" accept="image/*" class="hidden" onchange="previewVerifFile('selfie', this)"/>
+              </div>
+              <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl p-3">
+                <p class="text-xs text-blue-600 dark:text-blue-400"><i class="fa-solid fa-shield-halved mr-1"></i>Your ID is kept private and only used for verification. It is never shown publicly.</p>
+              </div>
+              <button onclick="submitVerification()" id="verif-submit-btn" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3 rounded-xl text-sm transition-colors disabled:opacity-50">
+                Submit for Verification
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Right about card (desktop) -->
+      <aside class="hidden lg:block w-64 flex-shrink-0">
+        <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-5 sticky top-20">
+          <h3 class="font-display font-semibold text-sm text-slate-800 dark:text-slate-100 mb-3">About</h3>
+          <div id="about-side" class="space-y-2 text-sm text-slate-600 dark:text-slate-300"></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<!-- MOBILE NAV -->
+<nav id="mobile-nav" class="fixed bottom-0 left-0 right-0 z-[90] bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-around px-2 py-2 md:hidden">
+  <a href="/feed.html" class="flex flex-col items-center gap-0.5 text-slate-400 px-3 py-1"><i class="fa-solid fa-house text-xl"></i><span class="text-xs">Home</span></a>
+  <a href="/search.html" class="flex flex-col items-center gap-0.5 text-slate-400 px-3 py-1"><i class="fa-solid fa-magnifying-glass text-xl"></i><span class="text-xs">Search</span></a>
+  <a href="/messages.html" class="relative flex flex-col items-center gap-0.5 text-slate-400 px-3 py-1"><i class="fa-regular fa-comment-dots text-xl"></i><span class="text-xs">Messages</span><span id="mob-msg-badge" class="absolute -top-1 right-1 notif-badge hidden">0</span></a>
+  <a href="/notifications.html" class="relative flex flex-col items-center gap-0.5 text-slate-400 px-3 py-1"><i class="fa-solid fa-bell text-xl"></i><span class="text-xs">Alerts</span></a>
+  <a href="#" class="flex flex-col items-center gap-0.5 text-brand-600 px-3 py-1"><i class="fa-solid fa-user text-xl"></i><span class="text-xs font-medium">Profile</span></a>
+</nav>
+
+<!-- EDIT PROFILE MODAL -->
+<div id="edit-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+  <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between mb-5">
+      <h3 class="font-display font-bold text-xl text-slate-900 dark:text-slate-100">Edit Profile</h3>
+      <button onclick="closeEditModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 flex items-center justify-center"><i class="fa-solid fa-xmark text-sm text-slate-500"></i></button>
+    </div>
+    <div class="space-y-4">
+      <!-- Read-only info banner -->
+      <div class="bg-slate-50 dark:bg-slate-800 rounded-xl px-4 py-3 text-xs text-slate-500 dark:text-slate-400 flex items-start gap-2">
+        <i class="fa-solid fa-circle-info text-brand-400 mt-0.5 flex-shrink-0"></i>
+        <span>Your name and permanent address are set during registration and cannot be changed here. Contact an administrator if a correction is needed.</span>
+      </div>
+      <!-- Bio (only editable field) -->
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Bio <span class="text-slate-400 font-normal normal-case">(up to 160 characters)</span></label>
+        <textarea id="edit-bio" rows="4" class="w-full bg-slate-50 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-slate-100 outline-none border border-transparent focus:border-brand-400 resize-none transition-all" maxlength="160" placeholder="Tell people about yourself..."></textarea>
+        <p class="text-xs text-slate-400 text-right mt-1"><span id="bio-char-count">0</span>/160</p>
+      </div>
+    </div>
+    <div class="flex gap-3 mt-6">
+      <button onclick="closeEditModal()" class="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-semibold hover:bg-slate-200 transition-colors">Cancel</button>
+      <button onclick="saveProfile()" class="flex-1 py-2.5 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 transition-colors">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- REPORT USER MODAL -->
+<div id="report-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+  <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md p-6">
+    <div class="flex items-center justify-between mb-5">
+      <h3 class="font-display font-bold text-xl text-slate-900 dark:text-slate-100"><i class="fa-solid fa-flag text-red-500 mr-2"></i>Report User</h3>
+      <button onclick="closeReportModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 flex items-center justify-center"><i class="fa-solid fa-xmark text-sm text-slate-500"></i></button>
+    </div>
+    <p class="text-xs text-slate-500 mb-4">Your report is anonymous. Admins will review it and take appropriate action.</p>
+    <div class="space-y-3">
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Reason</label>
+        <select id="report-reason" class="w-full bg-slate-50 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-slate-100 outline-none border border-transparent focus:border-red-400 transition-all">
+          <option value="">Select a reason…</option>
+          <option value="Harassment or bullying">Harassment or bullying</option>
+          <option value="Inappropriate content">Inappropriate content</option>
+          <option value="Spam or fake account">Spam or fake account</option>
+          <option value="Threats or violence">Threats or violence</option>
+          <option value="Impersonation">Impersonation</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Additional Details <span class="text-slate-400 font-normal normal-case">(optional)</span></label>
+        <textarea id="report-details" rows="3" class="w-full bg-slate-50 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-slate-100 outline-none border border-transparent focus:border-red-400 resize-none transition-all" maxlength="500" placeholder="Describe the issue…"></textarea>
+      </div>
+    </div>
+    <div class="flex gap-3 mt-6">
+      <button onclick="closeReportModal()" class="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-semibold hover:bg-slate-200 transition-colors">Cancel</button>
+      <button onclick="submitReport()" id="report-submit-btn" class="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors">Submit Report</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+  dayjs.extend(dayjs_plugin_relativeTime);
+  // Facebook-style time: "Today at 10:22 AM", "Yesterday at 3:15 PM", "March 20 at 9:00 AM"
+  function fbTime(ts) {
+    if (!ts) return '';
+    // Normalize: SQLite "YYYY-MM-DD HH:MM:SS" has no TZ → append Z to treat as UTC
+    const normalized = ts.includes('T') ? ts : (ts.replace(' ', 'T') + (ts.endsWith('Z') || ts.includes('+') ? '' : 'Z'));
+    const d = dayjs(normalized);
+    const now = dayjs();
+    const timeStr = d.format('h:mm A');
+    if (d.isSame(now, 'day')) return 'Today at ' + timeStr;
+    if (d.isSame(now.subtract(1, 'day'), 'day')) return 'Yesterday at ' + timeStr;
+    const sameYear = d.isSame(now, 'year');
+    return d.format(sameYear ? 'MMMM D' : 'MMMM D, YYYY') + ' at ' + timeStr;
+  }
+  let currentUser=null, profileUser=null, isOwn=false, postsPage=1, postsHasMore=true;
+  const socket=io();
+  const targetUsername=new URLSearchParams(location.search).get('u');
+
+  function toggleDark(){const on=localStorage.getItem('ch-dark')==='true';localStorage.setItem('ch-dark',String(!on));document.documentElement.classList.toggle('dark',!on);const i=document.getElementById('dark-icon');if(i)i.className=!on?'fa-solid fa-sun text-yellow-400 text-sm':'fa-solid fa-moon text-slate-500 text-sm';toast(!on?'Dark mode on':'Light mode on','info');}
+  (function(){const i=document.getElementById('dark-icon');if(i)i.className=localStorage.getItem('ch-dark')==='true'?'fa-solid fa-sun text-yellow-400 text-sm':'fa-solid fa-moon text-slate-500 text-sm';})();
+  function toast(msg,type='success'){Toastify({text:msg,duration:3000,gravity:'top',position:'right',stopOnFocus:false,style:{background:type==='success'?'#16a34a':type==='error'?'#e5365a':'#1a8cff',borderRadius:'12px',fontFamily:'DM Sans,sans-serif',fontSize:'14px',padding:'12px 20px',pointerEvents:'none'}}).showToast();}
+  function escHtml(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  function avatarUrl(f,l){return`https://ui-avatars.com/api/?name=${encodeURIComponent((f||'U')+' '+(l||''))}&background=1a8cff&color=fff&size=128`;}
+  function setBadge(id,count){const el=document.getElementById(id);if(!el)return;if(count>0){el.textContent=count>99?'99+':count;el.classList.remove('hidden');}else el.classList.add('hidden');}
+
+  async function init(){
+    const r=await fetch('/api/auth/me');const d=await r.json();
+    if(!d.loggedIn){window.location.href='/';return;}
+    currentUser=d.user;window.__currentUser=currentUser;socket.emit('join',currentUser.id);
+    const nav=document.getElementById('nav-avatar');if(nav)nav.src=currentUser.avatar||avatarUrl(currentUser.firstName,currentUser.lastName);
+    document.getElementById('dropdown-name').textContent=fullName(currentUser);
+    if(currentUser.role==='admin'){const al=document.getElementById('admin-nav-link');if(al)al.classList.remove('hidden');}
+    loadNavCounts();
+    const uname=targetUsername||currentUser.username;
+    const r2=await fetch(`/api/users/${uname}`);
+    if(!r2.ok){document.body.innerHTML='<div class="flex items-center justify-center h-screen"><div class="text-center"><div class="text-5xl mb-4">👤</div><p class="font-semibold text-slate-600 dark:text-slate-400">User not found</p><a href="/feed.html" class="text-brand-600 text-sm mt-2 inline-block hover:underline">Back to feed</a></div></div>';return;}
+    const d2=await r2.json();profileUser=d2.user;isOwn=currentUser.id===profileUser.id;
+    renderProfile();await loadPosts();
+  }
+
+  async function loadNavCounts(){
+    try{const[n,m]=await Promise.all([fetch('/api/notifications/unread-count').then(r=>r.json()),fetch('/api/messages/unread-count').then(r=>r.json()).catch(()=>({count:0}))]);
+    ['notif-badge'].forEach(id=>setBadge(id,n.count));['msg-badge','mob-msg-badge'].forEach(id=>setBadge(id,m.count));}catch{}
+  }
+
+  function renderProfile(){
+    const u=profileUser;
+    document.title=`${fullName(u)} — PGA-DAMIS`;
+    if(u.coverPhoto){const img=document.getElementById('cover-img');img.src=u.coverPhoto;img.classList.remove('hidden');}
+    const av=u.avatar||avatarUrl(u.firstName,u.lastName);
+    document.getElementById('profile-avatar').src=av;
+    document.getElementById('profile-name').textContent=fullName(u);
+    document.getElementById('profile-handle').textContent=`@${u.username}`;
+    if(u.idVerified)document.getElementById('verified-badge').classList.remove('hidden');
+    if(u.bio)document.getElementById('profile-bio').textContent=u.bio;
+
+    // Meta row under name
+    const meta=[];
+    if(u.permanentAddress)meta.push(`<span class="flex items-center gap-1.5"><i class="fa-solid fa-location-dot text-slate-400"></i>${escHtml(u.permanentAddress)}</span>`);
+    else if(u.location)meta.push(`<span class="flex items-center gap-1.5"><i class="fa-solid fa-location-dot text-slate-400"></i>${escHtml(u.location)}</span>`);
+    if(u.createdAt)meta.push(`<span class="flex items-center gap-1.5"><i class="fa-regular fa-calendar text-slate-400"></i>Joined ${dayjs(u.createdAt).format('MMMM YYYY')}</span>`);
+    if(u.course)meta.push(`<span class="flex items-center gap-1.5"><i class="fa-solid fa-graduation-cap text-slate-400"></i>${escHtml(u.course)}${u.yearLevel ? ' · ' + escHtml(u.yearLevel) : ''}</span>`);
+    document.getElementById('profile-meta').innerHTML=meta.join('');
+
+    document.getElementById('follower-count').textContent=u.friendCount??0;
+    document.getElementById('following-count').textContent=u.followerCount??0;
+    const fout=document.getElementById('followingout-count');if(fout)fout.textContent=u.followingCount??0;
+
+    // About section
+    const aboutItems=[];
+    if(u.bio)aboutItems.push(`<p class="leading-relaxed">${escHtml(u.bio)}</p>`);
+    const addr = u.permanentAddress || u.location;
+    if(addr)aboutItems.push(`<div class="flex items-center gap-2"><i class="fa-solid fa-location-dot w-4 text-slate-400"></i><span>${escHtml(addr)}</span></div>`);
+    if(u.course)aboutItems.push(`<div class="flex items-center gap-2"><i class="fa-solid fa-graduation-cap w-4 text-slate-400"></i><span>${escHtml(u.course)}${u.yearLevel?' · '+escHtml(u.yearLevel):''}</span></div>`);
+    if(u.createdAt)aboutItems.push(`<div class="flex items-center gap-2"><i class="fa-regular fa-calendar w-4 text-slate-400"></i><span>Joined ${dayjs(u.createdAt).format('MMMM YYYY')}</span></div>`);
+    if(!aboutItems.length)aboutItems.push('<p class="text-slate-400 text-xs">No info added yet.</p>');
+    const aboutHtml=aboutItems.join('');
+    document.getElementById('about-content').innerHTML=aboutHtml;
+    document.getElementById('about-side').innerHTML=aboutHtml;
+
+    if(isOwn){
+      document.getElementById('edit-profile-btn').classList.remove('hidden');
+      document.getElementById('avatar-edit-btn').classList.remove('hidden');
+      document.getElementById('cover-edit-btn').classList.remove('hidden');
+      initVerifyTab();
+      // Show own reputation as read-only score badge
+      const ownRepBadge = document.getElementById('own-rep-badge');
+      if (ownRepBadge) {
+        const score = u.reputationScore ?? 0;
+        ownRepBadge.classList.remove('hidden');
+        ownRepBadge.style.display='flex';
+        ownRepBadge.innerHTML = `<i class="fa-solid fa-star text-amber-400 text-xs"></i>
+          <span class="text-sm font-bold ${score > 0 ? 'text-green-600' : score < 0 ? 'text-red-500' : 'text-slate-400'}">${score > 0 ? '+' : ''}${score} rep</span>`;
+      }
+    } else {
+      const fBtn=document.getElementById('follow-btn');fBtn.classList.remove('hidden');
+      document.getElementById('message-btn').classList.remove('hidden');
+      setFollowBtn(u.areFriends, u.friendshipStatus||null);
+      document.getElementById('message-btn').onclick=()=>window.location.href=`/messages.html?u=${u.username}`;
+      // Follow button
+      const followOnlyBtn=document.getElementById('follow-only-btn');
+      if(followOnlyBtn){
+        followOnlyBtn.classList.remove('hidden');
+        if(u.isFollowing){followOnlyBtn.textContent='Unfollow';followOnlyBtn.className='text-sm font-semibold px-4 py-2 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors';}
+        else{followOnlyBtn.textContent='Follow';followOnlyBtn.className='bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold px-4 py-2 rounded-xl transition-colors';}
+        followOnlyBtn.onclick=()=>toggleFollowOnly(u.id);
+      }
+      // Reputation voting
+      const repActions=document.getElementById('reputation-actions');
+      if(repActions){
+        repActions.classList.remove('hidden');
+        repActions.style.display='flex';
+        updateRepDisplay(u.reputationScore??0, u.myVote??0);
+      }
+      // Report button
+      document.getElementById('report-user-btn')?.classList.remove('hidden');
+    }
+  }
+
+  function updateRepDisplay(score, myVote){
+    const scoreEl=document.getElementById('rep-score');
+    const upBtn=document.getElementById('rep-upvote-btn');
+    const downBtn=document.getElementById('rep-downvote-btn');
+    if(scoreEl){
+      scoreEl.textContent=(score>0?'+':'')+score;
+      scoreEl.className=`text-sm font-bold min-w-[2ch] text-center ${score>0?'text-green-600':score<0?'text-red-500':'text-slate-400 dark:text-slate-500'}`;
+    }
+    if(upBtn){
+      upBtn.className=`w-8 h-8 rounded-xl border-2 flex items-center justify-center transition-colors text-sm ${myVote===1?'border-green-500 bg-green-50 dark:bg-green-950/50 text-green-600':'border-slate-200 dark:border-slate-700 hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-950/40 text-slate-400 hover:text-green-600'}`;
+    }
+    if(downBtn){
+      downBtn.className=`w-8 h-8 rounded-xl border-2 flex items-center justify-center transition-colors text-sm ${myVote===-1?'border-red-500 bg-red-50 dark:bg-red-950/50 text-red-500':'border-slate-200 dark:border-slate-700 hover:border-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 text-slate-400 hover:text-red-500'}`;
+    }
+  }
+
+  async function castRepVote(value){
+    try{
+      const r=await fetch(`/api/users/${profileUser.username}/reputation`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({value})});
+      const d=await r.json();
+      if(!r.ok||d.error)throw new Error(d.error||'Failed');
+      profileUser.reputationScore=d.score;
+      profileUser.myVote=d.myVote;
+      updateRepDisplay(d.score,d.myVote);
+      toast(d.action==='removed'?'Vote removed':value===1?'+1 reputation given':'-1 reputation given','info');
+    }catch(e){toast(e.message,'error');}
+  }
+
+  function setFollowBtn(areFriends, friendshipStatus){
+    const btn=document.getElementById('follow-btn');
+    if(areFriends){
+      btn.textContent='Friends ✓';
+      btn.className='bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-red-50 hover:text-red-500 hover:border-red-200 text-slate-700 dark:text-slate-200 text-sm font-semibold px-5 py-2 rounded-xl transition-colors';
+      btn.title='Click to unfriend';
+    } else if(friendshipStatus?.status==='pending' && friendshipStatus?.iRequested){
+      btn.textContent='Request Sent';
+      btn.className='bg-amber-100 dark:bg-amber-900 border border-amber-300 text-amber-700 dark:text-amber-300 text-sm font-semibold px-5 py-2 rounded-xl transition-colors';
+    } else if(friendshipStatus?.status==='pending' && !friendshipStatus?.iRequested){
+      btn.textContent='Accept Request';
+      btn.className='bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-5 py-2 rounded-xl transition-colors';
+    } else {
+      btn.textContent='Add Friend';
+      btn.className='bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold px-5 py-2 rounded-xl transition-colors';
+    }
+  }
+  async function toggleFollow(){
+    const btn=document.getElementById('follow-btn');
+    if(btn.textContent.includes('Friends')){
+      if(!confirm('Remove this person from friends?'))return;
+      await fetch(`/api/users/${profileUser.id}/friend`,{method:'DELETE'});
+      setFollowBtn(false,null);
+      toast('Removed from friends');
+      const fc=document.getElementById('follower-count');
+      if(fc)fc.textContent=Math.max(0,parseInt(fc.textContent||1)-1);
+      return;
+    }
+    if(btn.textContent==='Request Sent'){
+      await fetch(`/api/users/${profileUser.id}/friend`,{method:'DELETE'});
+      setFollowBtn(false,null);
+      toast('Friend request cancelled');
+      return;
+    }
+    if(btn.textContent==='Accept Request'){
+      const r=await fetch(`/api/users/${profileUser.id}/friend/accept`,{method:'POST'});
+      if(r.ok){
+        const d=await r.json();
+        setFollowBtn(true,null);
+        toast('You are now friends! 🎉');
+        // Update friend count
+        const fc=document.getElementById('follower-count');
+        if(fc)fc.textContent=parseInt(fc.textContent||0)+1;
+        // Also update follow-only-btn to show Unfollow
+        const fob=document.getElementById('follow-only-btn');
+        if(fob){fob.textContent='Unfollow';fob.className='text-sm font-semibold px-4 py-2 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors';}
+      }
+      return;
+    }
+    // Send friend request
+    const r=await fetch(`/api/users/${profileUser.id}/friend`,{method:'POST'});
+    const d=await r.json();
+    if(d.error){toast(d.error,'error');return;}
+    setFollowBtn(d.areFriends||false, d.friendshipStatus||null);
+    if(d.status==='pending')toast('Friend request sent!');
+    else if(d.areFriends)toast('You are now friends! 🎉');
+  }
+
+  async function loadPosts(reset=true){
+    if(reset){postsPage=1;postsHasMore=true;}
+    const r=await fetch(`/api/users/${profileUser.username}/posts?page=${postsPage}&limit=10`);
+    const d=await r.json();
+    const c=document.getElementById('posts-container');
+    if(reset)c.innerHTML='';
+    if(!d.posts.length&&reset){
+      c.innerHTML=`<div class="post-card p-8 text-center"><div class="text-4xl mb-3">📝</div><p class="text-slate-500 dark:text-slate-400">${isOwn?"You haven't posted yet. Share something!":'No posts yet.'}</p></div>`;
+      document.getElementById('post-count').textContent=0;
+      document.getElementById('feed-footer').classList.remove('hidden');
+      document.getElementById('load-more-btn').classList.add('hidden');
+      document.getElementById('feed-end-msg').classList.remove('hidden');return;
+    }
+    if(reset) document.getElementById('post-count').textContent=d.total??d.posts.length+(d.hasMore?'+':'');
+    d.posts.forEach(p=>{const el=document.createElement('div');el.className='post-card p-4';el.id=`post-${p.id}`;el.innerHTML=renderPostHTML(p);c.appendChild(el);loadReactions(p.id);});
+    postsHasMore=d.hasMore;
+    document.getElementById('feed-footer').classList.remove('hidden');
+    document.getElementById('load-more-btn').classList.toggle('hidden',!postsHasMore);
+    document.getElementById('feed-end-msg').classList.toggle('hidden',postsHasMore);
+  }
+  async function loadMorePosts(){postsPage++;await loadPosts(false);}
+
+  function renderPostHTML(p){
+    const own=currentUser&&p.userId===currentUser.id;
+    const av=escHtml(p.author?.avatar||avatarUrl(p.author?.firstName,p.author?.lastName));
+    const vc=p.author?.idVerified?'<i class="fa-solid fa-circle-check text-brand-500 text-xs ml-1"></i>':'';
+    const img=p.imageUrl?`<img src="${escHtml(p.imageUrl)}" class="post-img mt-3 cursor-pointer" alt="" loading="lazy" onclick="openImgViewer('${escHtml(p.imageUrl)}')"/>`:'';
+    return `<div class="flex gap-3">
+      <a href="/profile.html?u=${escHtml(p.author?.username)}"><img src="${av}" class="w-10 h-10 rounded-full object-cover flex-shrink-0" onerror="this.src='${avatarUrl(p.author?.firstName,p.author?.lastName)}'"/></a>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-start justify-between gap-2">
+          <div><a href="/profile.html?u=${escHtml(p.author?.username)}" class="font-semibold text-sm text-slate-800 dark:text-slate-100 hover:text-brand-600">${escHtml(fullName(p.author))}</a>${vc}
+          <div class="text-xs text-slate-400">@${escHtml(p.author?.username)} · ${fbTime(p.createdAt)}</div></div>
+          ${own?`<button onclick="delPost('${p.id}')" class="w-7 h-7 rounded-full hover:bg-red-50 dark:hover:bg-red-950 flex items-center justify-center text-slate-300 hover:text-red-500 transition-colors"><i class="fa-solid fa-trash text-xs"></i></button>`:''}
+        </div>
+        <p class="text-sm text-slate-800 dark:text-slate-200 mt-2 leading-relaxed whitespace-pre-line">${escHtml(p.content)}</p>${img}
+        <div id="react-summary-${p.id}" class="flex items-center gap-1.5 mt-2 flex-wrap min-h-[18px]"></div>
+        <div class="flex items-center gap-0.5 mt-2 pt-2 border-t border-slate-50 dark:border-slate-800">
+          <div class="relative flex-shrink-0" id="rw-${p.id}">
+            <button id="rb-${p.id}" class="flex items-center gap-1.5 text-slate-500 text-sm px-2 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              onmouseenter="scheduleShowReaction('${p.id}')" onmouseleave="scheduleHideReaction('${p.id}')" onclick="quickReact('${p.id}')">
+              <span id="ri-${p.id}">👍</span><span id="rl-${p.id}" class="text-xs font-medium">Like</span>
+            </button>
+            <div id="reaction-bar-${p.id}" class="reaction-bar hidden"
+              onmouseenter="cancelHideReaction('${p.id}')" onmouseleave="scheduleHideReaction('${p.id}')">
+              <button onclick="submitReaction('${p.id}','like');event.stopPropagation()">👍</button>
+              <button onclick="submitReaction('${p.id}','love');event.stopPropagation()">❤️</button>
+              <button onclick="submitReaction('${p.id}','haha');event.stopPropagation()">😂</button>
+              <button onclick="submitReaction('${p.id}','wow');event.stopPropagation()">😮</button>
+              <button onclick="submitReaction('${p.id}','sad');event.stopPropagation()">😢</button>
+              <button onclick="submitReaction('${p.id}','angry');event.stopPropagation()">😡</button>
+            </div>
+          </div>
+          <button onclick="toggleComments('${p.id}')" class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 hover:text-brand-600 text-sm px-2 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+            <i class="fa-regular fa-comment"></i><span id="cc-${p.id}">${p.commentCount}</span>
+          </button>
+        </div>
+        <div id="cm-${p.id}" class="hidden comments-area mt-3 pt-3 border-t border-slate-50 dark:border-slate-800">
+          <div id="cl-${p.id}" class="space-y-3 mb-3"></div>
+          <div class="flex gap-2 items-end">
+            <img src="${escHtml(currentUser?.avatar||avatarUrl(currentUser?.firstName||'U',''))}" class="w-8 h-8 rounded-full object-cover flex-shrink-0"/>
+            <div class="flex-1 flex gap-2 items-end bg-slate-50 dark:bg-slate-800 rounded-2xl px-3 py-2 border border-transparent focus-within:border-brand-400 transition-all">
+              <textarea id="ci-${p.id}" rows="1" placeholder="Write a comment…"
+                class="flex-1 bg-transparent text-sm outline-none dark:text-slate-200 resize-none max-h-24"
+                oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,96)+'px'"
+                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitComment('${p.id}')}"></textarea>
+              <button onclick="submitComment('${p.id}')" class="text-brand-600 hover:text-brand-700 flex-shrink-0 pb-0.5"><i class="fa-solid fa-paper-plane text-sm"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // Shared with feed.html reaction functions
+  const EMOJI_MAP={like:'👍',love:'❤️',haha:'😂',wow:'😮',sad:'😢',angry:'😡'};
+  const EMOJI_COLOR={like:'#2563eb',love:'#ef4444',haha:'#f59e0b',wow:'#f59e0b',sad:'#3b82f6',angry:'#ef4444'};
+  const _reactionTimers={};
+  function scheduleShowReaction(id){cancelHideReaction(id);_reactionTimers[id+'_show']=setTimeout(()=>{const b=document.getElementById(`reaction-bar-${id}`);if(b)b.classList.remove('hidden');},400);}
+  function scheduleHideReaction(id){clearTimeout(_reactionTimers[id+'_show']);_reactionTimers[id+'_hide']=setTimeout(()=>{const b=document.getElementById(`reaction-bar-${id}`);if(b)b.classList.add('hidden');},300);}
+  function cancelHideReaction(id){clearTimeout(_reactionTimers[id+'_hide']);}
+  function quickReact(id){const b=document.getElementById(`reaction-bar-${id}`);if(b&&!b.classList.contains('hidden')){b.classList.add('hidden');}else{if(b)b.classList.remove('hidden');}}
+  async function submitReaction(postId,emoji){
+    if(!currentUser){toast('Please log in to react.','error');return;}
+    const res=await fetch(`/api/posts/${postId}/react`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({emoji})});
+    const data=await res.json();if(data.error)return;
+    scheduleHideReaction(postId);
+    const icon=document.getElementById(`ri-${postId}`),label=document.getElementById(`rl-${postId}`);
+    const btn=document.getElementById(`rb-${postId}`);
+    const summary=document.getElementById(`react-summary-${postId}`);
+    if(data.reacted){if(icon)icon.textContent=EMOJI_MAP[emoji]||'👍';if(label){label.textContent=emoji.charAt(0).toUpperCase()+emoji.slice(1);label.style.color=EMOJI_COLOR[emoji]||'';}if(btn)btn.classList.add('reacted');}
+    else{if(icon)icon.textContent='👍';if(label){label.textContent='Like';label.style.color='';}if(btn)btn.classList.remove('reacted');}
+    if(summary&&data.counts){const chips=Object.entries(data.counts).filter(([e,n])=>n>0).sort((a,b)=>b[1]-a[1]).slice(0,3);const total=Object.values(data.counts).reduce((a,b)=>a+b,0);summary.innerHTML=chips.length?chips.map(([e,n])=>`<span class="reaction-chip" onclick="submitReaction('${postId}','${e}')">${EMOJI_MAP[e]} ${n}</span>`).join('')+`<span class="text-xs text-slate-400 ml-1">${total}</span>`:''}
+  }
+  async function loadReactions(postId){
+    try{
+      const res=await fetch(`/api/posts/${postId}/reactions`);
+      const data=await res.json();
+      const counts=data.counts||{};
+      const userReaction=data.userReaction||null;
+      const summary=document.getElementById(`react-summary-${postId}`);
+      const icon=document.getElementById(`ri-${postId}`);
+      const label=document.getElementById(`rl-${postId}`);
+      const btn=document.getElementById(`rb-${postId}`);
+      if(summary){
+        const chips=Object.entries(counts).filter(([e,n])=>n>0).sort((a,b)=>b[1]-a[1]).slice(0,3);
+        const total=Object.values(counts).reduce((a,b)=>a+b,0);
+        const chipHtml=chips.map(([e,n])=>'<span class="reaction-chip" onclick="showReactors(\''+postId+'\',\'post\')">' + EMOJI_MAP[e] + ' ' + n + '</span>').join('');
+        const totalHtml=total?('<span class="text-xs text-slate-400 ml-1 cursor-pointer" onclick="showReactors(\''+postId+'\',\'post\')">' + total + '</span>'):'';
+        summary.innerHTML=chips.length?(chipHtml+totalHtml):'';
+      }
+      if(userReaction){
+        if(icon)icon.textContent=EMOJI_MAP[userReaction]||'👍';
+        if(label){label.textContent=userReaction.charAt(0).toUpperCase()+userReaction.slice(1);label.style.color=EMOJI_COLOR[userReaction]||'';}
+        if(btn)btn.classList.add('reacted');
+      }
+    }catch{}
+  }
+  async function toggleComments(id){const s=document.getElementById(`cm-${id}`);s.classList.toggle('hidden');if(!s.classList.contains('hidden')){loadComments(id);}}
+  function renderCommentItem(c,postId){
+    const replies=(c.replies||[]).map(r=>renderCommentItem(r,postId)).join('');
+    return `<div class="comment-item"><div class="flex gap-2 items-start">
+      <a href="/profile.html?u=${escHtml(c.username)}"><img src="${escHtml(c.avatar||avatarUrl(c.first_name,c.last_name))}" class="w-7 h-7 rounded-full object-cover flex-shrink-0 mt-0.5"/></a>
+      <div class="flex-1"><div class="bg-slate-50 dark:bg-slate-800 rounded-2xl px-3 py-2">
+        <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">${escHtml(c.first_name)} ${escHtml(c.last_name)}</span>
+        <p class="text-sm text-slate-700 dark:text-slate-300 mt-0.5 whitespace-pre-line">${escHtml(c.content)}</p>
+      </div>
+      <div class="flex items-center gap-2 mt-1 px-1 flex-wrap">
+        <span class="text-xs text-slate-400">${fbTime(c.created_at)}</span>
+        <div class="relative" id="crw-${c.id}">
+          <button class="text-xs font-semibold text-slate-400 hover:text-brand-600 transition-colors"
+            onmouseenter="scheduleShowReaction('${c.id}')" onmouseleave="scheduleHideReaction('${c.id}')"
+            onclick="quickReact('${c.id}')" id="crb-${c.id}">
+            <span id="cri-${c.id}">Like</span>
+          </button>
+          <div id="reaction-bar-${c.id}" class="reaction-bar hidden"
+            onmouseenter="cancelHideReaction('${c.id}')" onmouseleave="scheduleHideReaction('${c.id}')">
+            ${['like','love','haha','wow','sad','angry'].map(e=>`<button onclick="submitCommentReaction('${postId}','${c.id}','${e}');event.stopPropagation()">${{like:'👍',love:'❤️',haha:'😂',wow:'😮',sad:'😢',angry:'😡'}[e]}</button>`).join('')}
+          </div>
+        </div>
+        <span id="crc-${c.id}" class="flex gap-1 flex-wrap"></span>
+        <button onclick="startProfileReply('${postId}','${c.id}','${escHtml(c.first_name)}')" class="text-xs font-semibold text-slate-400 hover:text-brand-600">Reply</button>
+        ${currentUser&&c.user_id===currentUser.id?`<button onclick="delComment('${c.id}','${postId}')" class="text-xs text-slate-300 hover:text-red-400">Delete</button>`:''}
+      </div>
+      <div id="rpa-${c.id}" class="hidden mt-2">
+        <div class="flex gap-2 items-end bg-slate-50 dark:bg-slate-800 rounded-2xl px-3 py-2 border border-transparent focus-within:border-brand-400">
+          <textarea id="rpi-${c.id}" rows="1" placeholder="Write a reply…" class="flex-1 bg-transparent text-sm outline-none dark:text-slate-200 resize-none max-h-20"
+            oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,80)+'px'"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitComment('${postId}','${c.id}')}"></textarea>
+          <button onclick="submitComment('${postId}','${c.id}')" class="text-brand-600 hover:text-brand-700 flex-shrink-0 pb-0.5"><i class="fa-solid fa-paper-plane text-sm"></i></button>
+        </div>
+      </div>
+      </div></div>${replies?`<div style="margin-left:36px;margin-top:6px">${replies}</div>`:''}</div>`;
+  }
+  async function loadComments(id){
+    const r=await fetch(`/api/posts/${id}/comments`);const d=await r.json();
+    const l=document.getElementById(`cl-${id}`);if(!l)return;
+    if(!d.comments.length){l.innerHTML='<p class="text-xs text-slate-400 py-1">No comments yet.</p>';return;}
+    l.innerHTML=d.comments.map(c=>renderCommentItem(c,id)).join('');
+    // Load reactions for each comment and reply
+    const collect=c=>{loadCommentReactions(c.id);(c.replies||[]).forEach(collect);};
+    d.comments.forEach(collect);
+  }
+  async function loadCommentReactions(commentId){
+    try{
+      const res=await fetch(`/api/comments/${commentId}/reactors`);
+      const data=await res.json();
+      const reactors=data.reactors||[];
+      const chips=document.getElementById(`crc-${commentId}`);
+      const label=document.getElementById(`cri-${commentId}`);
+      if(!chips)return;
+      const counts={};
+      let userReaction=null;
+      reactors.forEach(r=>{counts[r.emoji]=(counts[r.emoji]||0)+1;if(currentUser&&r.user_id===currentUser.id)userReaction=r.emoji;});
+      const all=Object.entries(counts).filter(([e,n])=>n>0).sort((a,b)=>b[1]-a[1]);
+      chips.innerHTML=all.slice(0,3).map(([e,n])=>`<span class="reaction-chip" onclick="submitCommentReaction('_','${commentId}','${e}')">${EMOJI_MAP[e]} ${n}</span>`).join('');
+      if(label&&userReaction){label.textContent=userReaction.charAt(0).toUpperCase()+userReaction.slice(1);label.style.color=EMOJI_COLOR[userReaction]||'';}
+    }catch{}
+  }
+  function startProfileReply(postId,commentId,name){
+    document.querySelectorAll('[id^="rpa-"]').forEach(el=>el.classList.add('hidden'));
+    const area=document.getElementById(`rpa-${commentId}`);
+    if(area){area.classList.remove('hidden');const inp=document.getElementById(`rpi-${commentId}`);if(inp){inp.focus();inp.placeholder=`Reply to ${name}…`;}}
+  }
+  async function submitComment(id,parentId=null){
+    const inputId=parentId?`rpi-${parentId}`:`ci-${id}`;
+    const inp=document.getElementById(inputId);const content=inp?.value;if(!content?.trim())return;
+    inp.value='';inp.style.height='';
+    if(parentId){const a=document.getElementById(`rpa-${parentId}`);if(a)a.classList.add('hidden');}
+    const body={content:content.trim()};if(parentId)body.parentId=parentId;
+    const r=await fetch(`/api/posts/${id}/comments`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json();if(d.error){toast(d.error,'error');return;}
+    loadComments(id);if(!parentId){const cnt=document.getElementById(`cc-${id}`);if(cnt)cnt.textContent=parseInt(cnt.textContent||0)+1;}
+  }
+  async function submitCommentReaction(postId,commentId,emoji){
+    scheduleHideReaction(commentId);
+    if(!currentUser){toast('Please log in','error');return;}
+    const res=await fetch(`/api/comments/${commentId}/react`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({emoji})});
+    const data=await res.json();if(data.error)return;
+    loadCommentReactions(commentId);
+  }
+  async function delComment(commentId,postId){
+    if(!confirm('Delete this comment?'))return;
+    await fetch(`/api/comments/${commentId}`,{method:'DELETE'});loadComments(postId);
+  }
+  async function delPost(id){
+    if(!confirm('Delete this post?'))return;
+    await fetch(`/api/posts/${id}`,{method:'DELETE'});document.getElementById(`post-${id}`)?.remove();toast('Post deleted.');
+    const pc=document.getElementById('post-count');if(pc)pc.textContent=Math.max(0,parseInt(pc.textContent||0)-1);
+  }
+
+  async function showReactors(targetId, targetType){
+    const res=await fetch(`/api/${targetType==='post'?'posts':'comments'}/${targetId}/reactors`);
+    const data=await res.json();const reactors=data.reactors||[];
+    const groups={};reactors.forEach(r=>{if(!groups[r.emoji])groups[r.emoji]=[];groups[r.emoji].push(r);});
+    const total=reactors.length;
+    const modal=document.createElement('div');
+    modal.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px';
+    modal.onclick=e=>{if(e.target===modal)modal.remove();};
+    let activeTab='all';
+    const tabs=Object.keys(groups);
+    const renderModal=()=>{
+      const list=activeTab==='all'?reactors:(groups[activeTab]||[]);
+      modal.innerHTML=`<div class="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm max-h-[70vh] flex flex-col shadow-2xl overflow-hidden">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex-shrink-0">
+          <h3 class="font-display font-bold text-slate-800 dark:text-slate-100">Reactions · ${total}</h3>
+          <button onclick="this.closest('[style]').remove()" class="text-slate-400 hover:text-slate-600 text-xl">✕</button>
+        </div>
+        <div class="flex gap-1 px-4 pt-3 flex-shrink-0 flex-wrap">
+          <button onclick="window._rTab='all';window._rRender&&window._rRender()" class="px-3 py-1 rounded-full text-sm font-semibold ${activeTab==='all'?'bg-brand-600 text-white':'bg-slate-100 text-slate-600'}">All ${total}</button>
+          ${tabs.map(e=>`<button onclick="window._rTab='${e}';window._rRender&&window._rRender()" class="px-3 py-1 rounded-full text-sm font-semibold ${activeTab===e?'bg-brand-600 text-white':'bg-slate-100 text-slate-600'}">${EMOJI_MAP[e]} ${groups[e].length}</button>`).join('')}
+        </div>
+        <div class="flex-1 overflow-y-auto px-5 py-2">${list.map(r=>`<div class="flex items-center gap-3 py-2 border-b border-slate-50 dark:border-slate-800 last:border-0"><img src="${escHtml(r.avatar||avatarUrl(r.first_name,r.last_name))}" class="w-10 h-10 rounded-full object-cover"/><div class="flex-1"><p class="font-semibold text-sm">${escHtml(r.first_name)} ${escHtml(r.last_name)}</p><p class="text-xs text-slate-400">@${escHtml(r.username)}</p></div><span class="text-xl">${EMOJI_MAP[r.emoji]||'👍'}</span></div>`).join('')}</div>
+      </div>`;
+    };
+    window._rTab='all';window._rRender=()=>{activeTab=window._rTab;renderModal();};
+    renderModal();document.body.appendChild(modal);
+  }
+
+  async function toggleFollowOnly(userId){
+    const btn=document.getElementById('follow-only-btn');
+    const isFollowing=btn&&btn.textContent==='Unfollow';
+    const method=isFollowing?'DELETE':'POST';
+    const r=await fetch(`/api/users/${userId}/follow-only`,{method});
+    if(r.ok){
+      const d=await r.json();
+      if(btn){
+        if(d.following){btn.textContent='Unfollow';btn.className='text-sm font-semibold px-4 py-2 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors';}
+        else{btn.textContent='Follow';btn.className='bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold px-4 py-2 rounded-xl transition-colors';}
+      }
+      const fc=document.getElementById('following-count');if(fc)fc.textContent=parseInt(fc.textContent||0)+(d.following?1:-1);
+      toast(d.following?'Following!':'Unfollowed');
+    }
+  }
+
+  function switchTab(tab,btn){
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
+    document.getElementById('posts-tab').classList.toggle('hidden',tab!=='posts');
+    document.getElementById('about-tab').classList.toggle('hidden',tab!=='about');
+    document.getElementById('verify-tab').classList.toggle('hidden',tab!=='verify');
+  }
+
+  // ── ID Verification ─────────────────────────────
+  let verifFiles = { front: null, back: null, selfie: null };
+
+  function previewVerifFile(field, input) {
+    const file = input.files[0]; if (!file) return;
+    verifFiles[field] = file;
+    const reader = new FileReader();
+    reader.onload = e => {
+      document.getElementById(`verif-${field}-preview`).src = e.target.result;
+      document.getElementById(`verif-${field}-preview-wrap`).classList.remove('hidden');
+      document.getElementById(`verif-${field}-placeholder`).classList.add('hidden');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function submitVerification() {
+    if (!verifFiles.front) { toast('Please upload the front of your ID.', 'error'); return; }
+    const btn = document.getElementById('verif-submit-btn');
+    btn.disabled = true; btn.textContent = 'Uploading…';
+    try {
+      const fd = new FormData();
+      fd.append('id_front', verifFiles.front);
+      if (verifFiles.back)   fd.append('id_back',  verifFiles.back);
+      if (verifFiles.selfie) fd.append('selfie',   verifFiles.selfie);
+      fd.append('idType', document.getElementById('verif-id-type').value);
+      const r = await fetch('/api/users/me/submit-verification', { method: 'POST', body: fd });
+      const d = await r.json();
+      if (d.error) { toast(d.error, 'error'); return; }
+      toast('Verification submitted! We\'ll review it within 24 hours. ✅');
+      document.getElementById('verif-form').classList.add('hidden');
+      document.getElementById('verif-pending-notice').classList.remove('hidden');
+    } catch (e) {
+      toast('Upload failed. Please try again.', 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Submit for Verification';
+    }
+  }
+
+  async function initVerifyTab() {
+    const btn = document.getElementById('verify-tab-btn');
+    if (!btn) return;
+    btn.classList.remove('hidden');
+    if (profileUser.idVerified) {
+      document.getElementById('verif-already-verified').classList.remove('hidden');
+      document.getElementById('verif-form').classList.add('hidden');
+      return;
+    }
+    // Check if there's already a pending request
+    try {
+      const r = await fetch('/api/users/me/verification-status');
+      const d = await r.json();
+      if (d.status === 'pending') {
+        document.getElementById('verif-pending-notice').classList.remove('hidden');
+        document.getElementById('verif-form').classList.add('hidden');
+        // Allow re-submit button
+        const resubmitBtn = document.createElement('button');
+        resubmitBtn.className = 'mt-3 text-xs text-brand-600 hover:underline';
+        resubmitBtn.textContent = 'Resubmit with different photos';
+        resubmitBtn.onclick = () => {
+          document.getElementById('verif-pending-notice').classList.add('hidden');
+          document.getElementById('verif-form').classList.remove('hidden');
+        };
+        document.getElementById('verif-pending-notice').appendChild(resubmitBtn);
+      } else if (d.status === 'rejected') {
+        const note = document.getElementById('verif-pending-notice');
+        note.classList.remove('hidden');
+        note.classList.remove('bg-amber-50','dark:bg-amber-900/20','border-amber-200','dark:border-amber-800');
+        note.classList.add('bg-red-50','dark:bg-red-900/20','border-red-200','dark:border-red-800');
+        note.querySelector('i').className = 'fa-solid fa-xmark text-red-500 text-lg';
+        note.querySelector('p:first-child').textContent = 'Verification was not approved';
+        note.querySelector('p:last-child').textContent = d.request?.admin_notes || 'Please resubmit with clearer photos.';
+      }
+    } catch(e) {}
+  }
+
+  function openEditModal(){
+    const bioEl = document.getElementById('edit-bio');
+    bioEl.value = profileUser.bio || '';
+    // Update char counter
+    const counter = document.getElementById('bio-char-count');
+    if(counter) counter.textContent = bioEl.value.length;
+    bioEl.oninput = () => { if(counter) counter.textContent = bioEl.value.length; };
+    document.getElementById('edit-modal').classList.remove('hidden');
+    document.body.style.overflow='hidden';
+  }
+  function closeEditModal(){document.getElementById('edit-modal').classList.add('hidden');document.body.style.overflow='';}
+  async function saveProfile(){
+    const bio = document.getElementById('edit-bio').value.trim();
+    const r=await fetch('/api/users/me',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({bio})});
+    const d=await r.json();if(d.error){toast(d.error,'error');return;}
+    profileUser.bio = bio;
+    if(bio) document.getElementById('profile-bio').textContent = bio;
+    toast('Bio updated!');closeEditModal();
+    // refresh about sections
+    renderProfile();
+  }
+
+  // ── REPORT MODAL ──────────────────────────────────
+  function openReportModal(){
+    document.getElementById('report-reason').value='';
+    document.getElementById('report-details').value='';
+    document.getElementById('report-modal').classList.remove('hidden');
+    document.body.style.overflow='hidden';
+  }
+  function closeReportModal(){document.getElementById('report-modal').classList.add('hidden');document.body.style.overflow='';}
+  async function submitReport(){
+    const reason=document.getElementById('report-reason').value;
+    const details=document.getElementById('report-details').value.trim();
+    if(!reason){toast('Please select a reason.','error');return;}
+    const btn=document.getElementById('report-submit-btn');
+    btn.disabled=true;btn.textContent='Submitting…';
+    try{
+      const r=await fetch(`/api/users/${profileUser.username}/report`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason,details})});
+      const d=await r.json();
+      if(!r.ok||d.error)throw new Error(d.error||'Failed');
+      toast(d.message||'Report submitted.','success');closeReportModal();
+    }catch(e){toast(e.message,'error');}
+    finally{btn.disabled=false;btn.textContent='Submit Report';}
+  }
+  async function uploadAvatar(e){
+    const file=e.target.files[0];if(!file)return;
+    const fd=new FormData();fd.append('avatar',file);toast('Uploading...','info');
+    const r=await fetch('/api/users/me/avatar',{method:'PUT',body:fd});const d=await r.json();
+    if(d.error){toast(d.error,'error');return;}
+    document.getElementById('profile-avatar').src=d.avatar;document.getElementById('nav-avatar').src=d.avatar;toast('Avatar updated!');
+  }
+  async function uploadCover(e){
+    const file=e.target.files[0];if(!file)return;
+    const fd=new FormData();fd.append('cover',file);toast('Uploading...','info');
+    const r=await fetch('/api/users/me/cover',{method:'PUT',body:fd});const d=await r.json();
+    if(d.error){toast(d.error,'error');return;}
+    const img=document.getElementById('cover-img');img.src=d.coverPhoto;img.classList.remove('hidden');toast('Cover updated!');
+  }
+
+  function toggleAvatarMenu(){document.getElementById('avatar-dropdown').classList.toggle('hidden');}
+  function goProfile(){const u=window.__currentUser;if(u)window.location.href=`/profile.html?u=${u.username}`;}
+  async function logout(){await fetch('/api/auth/logout');window.location.href='/';}
+  document.addEventListener('click',(e)=>{if(!e.target.closest('#avatar-menu-wrap'))document.getElementById('avatar-dropdown')?.classList.add('hidden');});
+  const ns=document.getElementById('nav-search');if(ns)ns.addEventListener('input',(e)=>{clearTimeout(window._nst);window._nst=setTimeout(()=>{const q=e.target.value.trim();if(q.length>=2)window.location.href=`/search.html?q=${encodeURIComponent(q)}`;},600);});
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  function openImgViewer(url) {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;cursor:zoom-out';
+    overlay.onclick = () => overlay.remove();
+    document.addEventListener('keydown', function esc(e){ if(e.key==='Escape'){overlay.remove();document.removeEventListener('keydown',esc);}});
+    overlay.innerHTML = `<img src="${url}" style="max-width:90vw;max-height:90vh;border-radius:12px;object-fit:contain;box-shadow:0 25px 50px rgba(0,0,0,.5)"/>`;
+    document.body.appendChild(overlay);
+  }
+
+    init();
+</script>
+</body>
+</html>

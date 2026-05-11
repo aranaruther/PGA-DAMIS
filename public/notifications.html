@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>PGA-DAMIS — Notifications</title>
+  <link rel="manifest" href="/manifest.json"/><meta name="theme-color" content="#0070e0"/>
+  <script>if(localStorage.getItem('ch-dark')==='true')document.documentElement.classList.add('dark');</script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/relativeTime.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <link rel="stylesheet" href="/css/app.css"/>
+  <script>tailwind.config={darkMode:'class',theme:{extend:{fontFamily:{display:['Sora','sans-serif'],sans:['DM Sans','sans-serif']},colors:{brand:{50:'#eef6ff',100:'#d9ecff',400:'#4da6ff',500:'#1a8cff',600:'#0070e0',700:'#005bb5'}}}}}</script>
+  <style>
+    .nitem{animation:fadeIn .2s ease;border-bottom:1px solid var(--border);}
+    .nitem:last-child{border-bottom:none;}
+    .nitem.unread{background:#eef6ff;}
+    html.dark .nitem.unread{background:#1a3050;}
+    .nitem:hover{background:var(--surface-2);}
+    .type-icon{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;flex-shrink:0;position:absolute;bottom:-1px;right:-1px;border:2px solid var(--surface);}
+    .ti-like{background:#fde8ed;color:#e5365a;}.ti-comment{background:#eef6ff;color:#0070e0;}.ti-follow{background:#f0fdf4;color:#16a34a;}
+    .filter-btn.active{background:#0070e0;color:#fff;border-color:transparent;}
+    html.dark .filter-btn.active{background:#58a6ff;color:#0d1117;}
+  </style>
+</head>
+<body class="h-full">
+
+<!-- NAVBAR -->
+<nav id="navbar" class="px-4 flex items-center justify-between gap-3">
+  <a href="/feed.html" class="flex items-center gap-2 font-display font-bold text-lg text-slate-800 dark:text-slate-100 flex-shrink-0">
+    <div class="w-8 h-8 rounded-xl bg-brand-600 flex items-center justify-center"><i class="fa-solid fa-people-group text-white text-sm"></i></div>
+    <span class="hidden sm:inline">PGA-DAMIS</span>
+  </a>
+  <div class="flex-1 max-w-xs hidden md:flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl px-3 py-2 gap-2">
+    <i class="fa-solid fa-magnifying-glass text-slate-400 text-sm"></i>
+    <input id="nav-search" type="text" placeholder="Search..." class="bg-transparent text-sm outline-none w-full text-slate-700 dark:text-slate-200 placeholder-slate-400"/>
+  </div>
+  <div class="flex items-center gap-2">
+    <a href="/messages.html" class="relative w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 flex items-center justify-center transition-colors">
+      <i class="fa-regular fa-comment-dots text-slate-600 dark:text-slate-300 text-sm"></i><span id="msg-badge" class="notif-badge hidden">0</span>
+    </a>
+    <button class="relative w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center">
+      <i class="fa-solid fa-bell text-brand-600 dark:text-brand-400 text-sm"></i><span id="notif-badge" class="notif-badge hidden">0</span>
+    </button>
+    <button onclick="toggleDark()" class="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 flex items-center justify-center transition-colors">
+      <i id="dark-icon" class="fa-solid fa-moon text-slate-500 dark:text-yellow-400 text-sm"></i>
+    </button>
+    <div class="relative" id="avatar-menu-wrap">
+      <button onclick="toggleAvatarMenu()" class="w-9 h-9 rounded-xl overflow-hidden border-2 border-slate-200 dark:border-slate-700 hover:border-brand-500 transition-colors">
+        <img id="nav-avatar" src="" alt="me" class="w-full h-full object-cover" onerror="this.src='https://ui-avatars.com/api/?name=U&background=1a8cff&color=fff'"/>
+      </button>
+      <div id="avatar-dropdown" class="hidden absolute right-0 top-12 w-56 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 py-2 z-50">
+        <div id="dropdown-name" class="px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 border-b border-slate-100 dark:border-slate-700 mb-1"></div>
+        <a href="#" onclick="goProfile()" class="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg mx-1"><i class="fa-solid fa-user w-4 text-brand-500"></i> My Profile</a>
+        <a href="/feed.html" class="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg mx-1"><i class="fa-solid fa-house w-4 text-slate-400"></i> Home Feed</a>
+        <div class="border-t border-slate-100 dark:border-slate-700 mt-1 pt-1 mx-1">
+          <button onclick="logout()" class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg"><i class="fa-solid fa-right-from-bracket w-4"></i> Log out</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- LAYOUT -->
+<div class="max-w-6xl mx-auto px-4 pt-[76px] pb-24 md:pb-8 flex gap-6">
+  <!-- LEFT SIDEBAR -->
+  <aside class="sidebar hidden lg:block w-60 flex-shrink-0">
+    <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-4 space-y-1">
+      <a href="/feed.html" class="nav-link"><i class="fa-solid fa-house w-4"></i> Home</a>
+      <a href="#" onclick="goProfile()" class="nav-link"><i class="fa-solid fa-user w-4"></i> Profile</a>
+      <a href="/search.html" class="nav-link"><i class="fa-solid fa-magnifying-glass w-4"></i> Search</a>
+      <a href="/messages.html" class="nav-link relative"><i class="fa-regular fa-comment-dots w-4"></i> Messages<span id="sidebar-msg-badge" class="ml-auto bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full hidden"></span></a>
+      <a href="/notifications.html" class="nav-link active"><i class="fa-solid fa-bell w-4"></i> Notifications<span id="sidebar-notif-badge" class="ml-auto bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full hidden"></span></a>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="flex-1 min-w-0">
+    <!-- Header card -->
+    <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-5 mb-4">
+      <div class="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h1 class="font-display font-bold text-xl text-slate-900 dark:text-slate-100">Notifications</h1>
+          <p id="unread-summary" class="text-sm text-slate-400 mt-0.5">Loading...</p>
+        </div>
+        <button onclick="markAllRead()" class="text-sm text-brand-600 dark:text-brand-400 font-semibold hover:bg-brand-50 dark:hover:bg-brand-900/30 px-4 py-2 rounded-xl transition-colors border border-brand-200 dark:border-brand-800">
+          <i class="fa-solid fa-check-double mr-1.5"></i>Mark all read
+        </button>
+      </div>
+      <!-- Filter tabs -->
+      <div class="flex gap-2 mt-4 flex-wrap">
+        <button onclick="setFilter('all',this)" class="filter-btn active text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 transition-all">All</button>
+        <button onclick="setFilter('like',this)" class="filter-btn text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 text-slate-500 transition-all"><i class="fa-solid fa-heart mr-1 text-red-400"></i>Likes</button>
+        <button onclick="setFilter('comment',this)" class="filter-btn text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 text-slate-500 transition-all"><i class="fa-solid fa-comment mr-1 text-brand-400"></i>Comments</button>
+        <button onclick="setFilter('follow',this)" class="filter-btn text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 text-slate-500 transition-all"><i class="fa-solid fa-user-plus mr-1 text-green-500"></i>Follows</button>
+      </div>
+    </div>
+
+    <!-- Notification list -->
+    <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden" id="notif-container">
+      <div class="p-5 border-b border-slate-100 dark:border-slate-800"><div class="flex gap-4 items-start"><div class="skeleton w-12 h-12 rounded-full flex-shrink-0"></div><div class="flex-1 space-y-2 pt-1"><div class="skeleton h-3 w-3/4"></div><div class="skeleton h-2 w-1/3"></div></div></div></div>
+      <div class="p-5 border-b border-slate-100 dark:border-slate-800"><div class="flex gap-4 items-start"><div class="skeleton w-12 h-12 rounded-full flex-shrink-0"></div><div class="flex-1 space-y-2 pt-1"><div class="skeleton h-3 w-2/3"></div><div class="skeleton h-2 w-1/4"></div></div></div></div>
+      <div class="p-5"><div class="flex gap-4 items-start"><div class="skeleton w-12 h-12 rounded-full flex-shrink-0"></div><div class="flex-1 space-y-2 pt-1"><div class="skeleton h-3 w-1/2"></div><div class="skeleton h-2 w-1/5"></div></div></div></div>
+    </div>
+  </main>
+</div>
+
+<!-- MOBILE NAV -->
+<nav id="mobile-nav" class="fixed bottom-0 left-0 right-0 z-[90] bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-around px-2 py-2 md:hidden">
+  <a href="/feed.html" class="flex flex-col items-center gap-0.5 text-slate-400 px-3 py-1"><i class="fa-solid fa-house text-xl"></i><span class="text-xs">Home</span></a>
+  <a href="/search.html" class="flex flex-col items-center gap-0.5 text-slate-400 px-3 py-1"><i class="fa-solid fa-magnifying-glass text-xl"></i><span class="text-xs">Search</span></a>
+  <a href="/messages.html" class="relative flex flex-col items-center gap-0.5 text-slate-400 px-3 py-1"><i class="fa-regular fa-comment-dots text-xl"></i><span class="text-xs">Messages</span><span id="mob-msg-badge" class="absolute -top-1 right-1 notif-badge hidden">0</span></a>
+  <a href="/notifications.html" class="relative flex flex-col items-center gap-0.5 text-brand-600 px-3 py-1"><i class="fa-solid fa-bell text-xl"></i><span class="text-xs font-medium">Alerts</span></a>
+  <a href="#" onclick="goProfile()" class="flex flex-col items-center gap-0.5 text-slate-400 px-3 py-1"><i class="fa-solid fa-user text-xl"></i><span class="text-xs">Profile</span></a>
+</nav>
+
+<script src="/js/api.js"></script>
+<script>
+  dayjs.extend(dayjs_plugin_relativeTime);
+  // Facebook-style time: "Today at 10:22 AM", "Yesterday at 3:15 PM", "March 20 at 9:00 AM"
+  function fbTime(ts) {
+    if (!ts) return '';
+    // Normalize: SQLite "YYYY-MM-DD HH:MM:SS" has no TZ → append Z to treat as UTC
+    const normalized = ts.includes('T') ? ts : (ts.replace(' ', 'T') + (ts.endsWith('Z') || ts.includes('+') ? '' : 'Z'));
+    const d = dayjs(normalized);
+    const now = dayjs();
+    const timeStr = d.format('h:mm A');
+    if (d.isSame(now, 'day')) return 'Today at ' + timeStr;
+    if (d.isSame(now.subtract(1, 'day'), 'day')) return 'Yesterday at ' + timeStr;
+    const sameYear = d.isSame(now, 'year');
+    return d.format(sameYear ? 'MMMM D' : 'MMMM D, YYYY') + ' at ' + timeStr;
+  }
+  let currentUser=null, allNotifs=[], activeFilter='all';
+  const socket=io();
+
+  function toggleDark(){const on=localStorage.getItem('ch-dark')==='true';localStorage.setItem('ch-dark',String(!on));document.documentElement.classList.toggle('dark',!on);const i=document.getElementById('dark-icon');if(i)i.className=!on?'fa-solid fa-sun text-yellow-400 text-sm':'fa-solid fa-moon text-slate-500 text-sm';toast(!on?'Dark mode on':'Light mode on','info');}
+  (function(){const i=document.getElementById('dark-icon');if(i)i.className=localStorage.getItem('ch-dark')==='true'?'fa-solid fa-sun text-yellow-400 text-sm':'fa-solid fa-moon text-slate-500 text-sm';})();
+  function toast(msg,type='success'){Toastify({text:msg,duration:3000,gravity:'top',position:'right',stopOnFocus:false,style:{background:type==='success'?'#16a34a':type==='error'?'#e5365a':'#1a8cff',borderRadius:'12px',fontFamily:'DM Sans,sans-serif',fontSize:'14px',padding:'12px 20px',pointerEvents:'none'}}).showToast();}
+  function escHtml(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  function avatarUrl(f,l){return`https://ui-avatars.com/api/?name=${encodeURIComponent((f||'U')+' '+(l||''))}&background=1a8cff&color=fff&size=128`;}
+  function setBadge(id,count){const el=document.getElementById(id);if(!el)return;if(count>0){el.textContent=count>99?'99+':count;el.classList.remove('hidden');}else el.classList.add('hidden');}
+
+  async function init(){
+    const r=await fetch('/api/auth/me');const d=await r.json();
+    if(!d.loggedIn){window.location.href='/';return;}
+    currentUser=d.user;window.__currentUser=currentUser;socket.emit('join',currentUser.id);
+    document.getElementById('nav-avatar').src=currentUser.avatar||avatarUrl(currentUser.firstName,currentUser.lastName);
+    document.getElementById('dropdown-name').textContent=`${currentUser.firstName} ${currentUser.lastName}`;
+    await Promise.all([loadNavCounts(),loadNotifications()]);
+  }
+
+  async function loadNavCounts(){
+    try{const[n,m]=await Promise.all([fetch('/api/notifications/unread-count').then(r=>r.json()),fetch('/api/messages/unread-count').then(r=>r.json()).catch(()=>({count:0}))]);
+    ['notif-badge','sidebar-notif-badge'].forEach(id=>setBadge(id,n.count));['msg-badge','sidebar-msg-badge','mob-msg-badge'].forEach(id=>setBadge(id,m.count));}catch{}
+  }
+
+  async function loadNotifications(){
+    const r=await fetch('/api/notifications');const d=await r.json();
+    allNotifs=d.notifications||[];
+    const unread=allNotifs.filter(n=>!n.is_read).length;
+    document.getElementById('unread-summary').textContent=unread>0?`${unread} unread notification${unread!==1?'s':''}`:'✨ All caught up!';
+    setBadge('notif-badge',unread);setBadge('sidebar-notif-badge',unread);
+    renderNotifs();
+  }
+
+  function setFilter(type,btn){
+    activeFilter=type;
+    document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');renderNotifs();
+  }
+
+  const REACTION_EMOJI={like:'👍',love:'❤️',haha:'😂',wow:'😮',sad:'😢',angry:'😡'};
+  function typeInfo(t){
+    if(t&&t.startsWith('reaction_')) return {cls:'ti-like', icon:'fa-face-smile', emoji:REACTION_EMOJI[t.replace('reaction_','')]||'👍'};
+    if(t==='like')           return {cls:'ti-like',   icon:'fa-heart'};
+    if(t==='comment')        return {cls:'ti-comment', icon:'fa-comment'};
+    if(t==='comment_reply')  return {cls:'ti-comment', icon:'fa-reply'};
+    if(t==='follow')         return {cls:'ti-follow',  icon:'fa-user-plus'};
+    if(t==='follow_request') return {cls:'ti-follow',  icon:'fa-user-clock'};
+    if(t==='friend_request') return {cls:'ti-follow',  icon:'fa-user-clock'};
+    if(t==='friend_accept')  return {cls:'ti-follow',  icon:'fa-user-check'};
+    if(t==='post_approved')  return {cls:'ti-follow',  icon:'fa-circle-check'};
+    if(t==='post_rejected')  return {cls:'ti-like',    icon:'fa-circle-xmark'};
+    return {cls:'ti-comment', icon:'fa-bell'};
+  }
+  function notifMsg(n){
+    const name=escHtml(n.first_name||'Someone');
+    if(n.type&&n.type.startsWith('reaction_')){
+      const emoji=REACTION_EMOJI[n.type.replace('reaction_','')]||'👍';
+      const label=n.type.replace('reaction_','');
+      const label_cap=label.charAt(0).toUpperCase()+label.slice(1);
+      // n.message has the specific text (comment/post/reply), use it
+      if(n.message) return `<strong>${name}</strong> ${escHtml(n.message.replace(n.first_name||'','').trim())||('reacted '+emoji+' '+label_cap+' to your post')}`;
+      return `<strong>${name}</strong> reacted ${emoji} ${label_cap} to your post`;
+    }
+    if(n.type==='like')           return `<strong>${name}</strong> liked your post`;
+    if(n.type==='comment')        return `<strong>${name}</strong> commented on your post`;
+    if(n.type==='comment_reply')  return `<strong>${name}</strong> replied to a comment`;
+    if(n.type==='follow')         return `<strong>${name}</strong> started following you`;
+    if((n.type==='follow_request'||n.type==='friend_request')||n.type==='friend_request') return `<strong>${name}</strong> sent you a friend request`;
+    if(n.type==='friend_accept')  return `<strong>${name}</strong> accepted your friend request`;
+    if(n.type==='post_approved')  return n.message || 'Your post was approved ✅';
+    if(n.type==='post_rejected')  return n.message || 'Your post was removed';
+    return n.message||'New notification';
+  }
+  function notifLink(n){
+    if(n.type==='follow') return `/profile.html?u=${n.username||''}`;
+    return n.target_id?`/feed.html#post-${n.target_id}`:'/feed.html';
+  }
+
+  function renderNotifs(){
+    const list=activeFilter==='all'?allNotifs:allNotifs.filter(n=>n.type===activeFilter);
+    const el=document.getElementById('notif-container');
+    if(!list.length){
+      const em={all:'🔔',like:'❤️',comment:'💬',follow:'👤'}[activeFilter]||'🔔';
+      el.innerHTML=`<div class="py-16 text-center"><div class="text-5xl mb-3">${em}</div><p class="font-semibold text-slate-700 dark:text-slate-200">No ${activeFilter==='all'?'':activeFilter+' '}notifications yet</p><p class="text-sm text-slate-400 mt-1">Interact with people and they&#39;ll show up here.</p></div>`;return;
+    }
+
+    // Group by date
+    const today=dayjs().startOf('day'),yesterday=today.subtract(1,'day');
+    const groups=[['Today',[]],['Yesterday',[]],['Earlier',[]]];
+    list.forEach(n=>{
+      const d=dayjs(n.created_at);
+      if(d.isAfter(today)) groups[0][1].push(n);
+      else if(d.isAfter(yesterday)) groups[1][1].push(n);
+      else groups[2][1].push(n);
+    });
+
+    let html='';
+    for(const[label,items] of groups){
+      if(!items.length) continue;
+      html+=`<div class="px-5 py-2 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800"><p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">${label}</p></div>`;
+      html+=items.map(n=>{
+        const isReputation = n.type === 'reputation';
+        const av=escHtml(n.avatar||avatarUrl(n.first_name||'U',n.last_name||''));
+        const info=typeInfo(n.type);const{cls,icon}=info;
+        // Reputation votes are anonymous — never reveal the voter's identity
+        const avatarHtml = isReputation
+          ? `<div class="w-12 h-12 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center"><i class="fa-solid fa-user-secret text-slate-400 dark:text-slate-500 text-xl"></i></div>`
+          : `<img src="${av}" class="w-12 h-12 rounded-full object-cover" onerror="this.src='${avatarUrl(n.first_name||'U','')}'">`;
+        return `<div class="nitem ${n.is_read?'':'unread'} transition-colors"><a href="${notifLink(n)}" onclick="markRead('${n.id}')" class="flex gap-4 items-start px-5 py-4 group">
+          <div class="relative flex-shrink-0">${avatarHtml}<div class="type-icon ${cls}">${info.emoji?`<span style="font-size:13px;line-height:1">${info.emoji}</span>`:`<i class="fa-solid ${icon}"></i>`}</div></div>
+          <div class="flex-1 min-w-0 pt-1"><p class="text-sm text-slate-800 dark:text-slate-200 leading-snug">${notifMsg(n)}</p><p class="text-xs text-slate-400 mt-1.5">${fbTime(n.created_at)}</p>
+          ${(n.type==='follow_request'||n.type==='friend_request')&&!n._handled&&!n.is_read&&!n._accepted?`<div class="flex gap-2 mt-2" onclick="event.preventDefault();event.stopPropagation()"><button onclick="handleFollowReq('${n.actor_id}','accept','${n.id}',this.parentElement)" class="text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white px-4 py-1.5 rounded-lg transition-colors">Accept</button><button onclick="handleFollowReq('${n.actor_id}','decline','${n.id}',this.parentElement)" class="text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-4 py-1.5 rounded-lg transition-colors">Decline</button></div>`:''}</div>
+          ${!n.is_read?'<div class="w-2.5 h-2.5 rounded-full bg-brand-500 flex-shrink-0 mt-2.5 ring-2 ring-brand-200 dark:ring-brand-900"></div>':''}
+        </a></div>`;
+      }).join('');
+    }
+    el.innerHTML=html;
+  }
+
+  async function handleFollowReq(fromUserId, action, notifId, btnWrap){
+    // Disable buttons immediately to prevent double-click
+    if(btnWrap) btnWrap.querySelectorAll('button').forEach(b=>b.disabled=true);
+    const url = `/api/users/${fromUserId}/friend/${action}`;
+    const r = await fetch(url, {method:'POST'});
+    if(r.ok){
+      if(btnWrap) btnWrap.innerHTML = action==='accept'
+        ? '<span class="text-xs text-green-600 font-semibold">✓ Now friends!</span>'
+        : '<span class="text-xs text-slate-400">Request declined</span>';
+      await markRead(notifId);
+      // Update the notification in allNotifs so refresh doesn't re-show buttons
+      const n=allNotifs.find(x=>x.id===notifId);
+      if(n){n.is_read=1;n._handled=action;}
+      toast(action==='accept'?'You are now friends! 🎉':'Request declined');
+    } else {
+      if(btnWrap) btnWrap.querySelectorAll('button').forEach(b=>b.disabled=false);
+      toast('Something went wrong','error');
+    }
+  }
+
+  async function markRead(id){
+    await fetch(`/api/notifications/${id}/read`,{method:'PUT'});
+    const n=allNotifs.find(x=>x.id==id);if(n)n.is_read=1;
+    const unread=allNotifs.filter(x=>!x.is_read).length;
+    setBadge('notif-badge',unread);setBadge('sidebar-notif-badge',unread);
+    document.getElementById('unread-summary').textContent=unread>0?`${unread} unread notification${unread!==1?'s':''}`:'✨ All caught up!';
+  }
+  async function markAllRead(){
+    await fetch('/api/notifications/read-all',{method:'PUT'});
+    allNotifs.forEach(n=>n.is_read=1);setBadge('notif-badge',0);setBadge('sidebar-notif-badge',0);
+    document.getElementById('unread-summary').textContent='✨ All caught up!';
+    renderNotifs();toast('All marked as read');
+  }
+
+  socket.on('new-notification',async()=>{ await loadNotifications(); });
+  socket.on('receive-dm',()=>{ loadNavCounts(); });
+
+  function toggleAvatarMenu(){document.getElementById('avatar-dropdown').classList.toggle('hidden');}
+  function goProfile(){const u=window.__currentUser;if(u)window.location.href=`/profile.html?u=${u.username}`;}
+  async function logout(){await fetch('/api/auth/logout');window.location.href='/';}
+  document.addEventListener('click',(e)=>{if(!e.target.closest('#avatar-menu-wrap'))document.getElementById('avatar-dropdown')?.classList.add('hidden');});
+  const ns=document.getElementById('nav-search');if(ns)ns.addEventListener('input',(e)=>{clearTimeout(window._nst);window._nst=setTimeout(()=>{const q=e.target.value.trim();if(q.length>=2)window.location.href=`/search.html?q=${encodeURIComponent(q)}`;},600);});
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  init();
+</script>
+</body>
+</html>

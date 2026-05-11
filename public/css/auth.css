@@ -1,0 +1,219 @@
+/* ════════════════════════════════════════════════════
+   public/css/auth.css
+   All styles for the login / registration page.
+   Loaded by index.html via <link rel="stylesheet">
+   ════════════════════════════════════════════════════ */
+
+/* ── Base reset ── */
+*, *::before, *::after { box-sizing: border-box; }
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+
+/* ── Brand panel gradient ── */
+.brand-panel {
+  background: linear-gradient(145deg, #1e3a8a 0%, #2563eb 50%, #0284c7 100%);
+  position: relative;
+  overflow: hidden;
+}
+.brand-panel::before {
+  content: ''; position: absolute;
+  width: 420px; height: 420px; border-radius: 50%;
+  background: rgba(255,255,255,.07);
+  top: -120px; right: -120px;
+}
+.brand-panel::after {
+  content: ''; position: absolute;
+  width: 260px; height: 260px; border-radius: 50%;
+  background: rgba(255,255,255,.05);
+  bottom: -60px; left: -60px;
+}
+.brand-dots {
+  position: absolute; inset: 0;
+  background-image: radial-gradient(rgba(255,255,255,.12) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* ── Form inputs ── */
+.form-input {
+  transition: border-color .2s, box-shadow .2s, background .2s;
+  width: 100%;
+}
+.form-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .14);
+  background: #fff;
+}
+.form-input.is-error {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, .12);
+}
+
+/* ── Password requirement checklist items ── */
+.req-item { transition: color .25s; }
+.req-item.ok  { color: #10b981; }
+.req-item.bad { color: #94a3b8; }
+
+/* ── Strength bar segments ── */
+.seg {
+  height: 4px;
+  border-radius: 99px;
+  background: #e2e8f0;
+  transition: background .4s;
+}
+
+/* ── Progress step bar ── */
+.step-bar { transition: width .5s cubic-bezier(.4, 0, .2, 1); }
+
+/* ── Avatar upload overlay ── */
+.avatar-wrap .av-overlay {
+  opacity: 0;
+  transition: opacity .2s;
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  background: rgba(0,0,0,.4);
+  display: flex; align-items: center; justify-content: center;
+}
+.avatar-wrap:hover .av-overlay { opacity: 1; }
+
+/* ── Drag & drop zone ── */
+.drop-zone { transition: border-color .2s, background .2s; }
+.drop-zone.drag-over { border-color: #2563eb; background: #eff6ff; }
+
+/* ── OTP input boxes ── */
+.otp-box {
+  width: 46px; height: 54px;
+  border: 2px solid #e2e8f0;
+  border-radius: 14px;
+  text-align: center;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #1e293b;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  transition: border-color .15s, box-shadow .15s, background .15s;
+  background: #f8fafc;
+  caret-color: #2563eb;
+}
+.otp-box:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .14);
+  background: #fff;
+}
+.otp-box:not(:placeholder-shown) {
+  border-color: #94a3b8;
+  background: #fff;
+}
+.otp-box.otp-error {
+  border-color: #ef4444;
+  background: #fff5f5;
+  animation: otp-shake .35s ease;
+}
+@keyframes otp-shake {
+  0%,100% { transform: translateX(0); }
+  20%      { transform: translateX(-4px); }
+  40%      { transform: translateX( 4px); }
+  60%      { transform: translateX(-3px); }
+  80%      { transform: translateX( 3px); }
+}
+
+/* ── Upload progress bar ── */
+.upload-progress-bar {
+  transition: width 0.1s linear;
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+}
+#av-bar, #id-bar {
+  transition: width 0.1s linear;
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+}
+.tabular-nums { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+
+/* ── Terms modal overlay ── */
+.modal-bg {
+  background: rgba(15, 23, 42, .55);
+  backdrop-filter: blur(4px);
+}
+
+/* ── Terms modal scroll area ── */
+.terms-body {
+  max-height: 340px;
+  overflow-y: auto;
+}
+.terms-body::-webkit-scrollbar { width: 4px; }
+.terms-body::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+
+/* ── Loading spinner ── */
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Animations ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60%  { transform: translateX(-5px); }
+  40%, 80%  { transform: translateX(5px); }
+}
+@keyframes popIn {
+  from { opacity: 0; transform: scale(.85); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.anim-fade-up  { animation: fadeUp  .4s ease both; }
+.anim-slide-in { animation: slideIn .35s ease both; }
+.anim-shake    { animation: shake   .4s ease; }
+.anim-pop      { animation: popIn   .3s cubic-bezier(.34,1.56,.64,1) both; }
+
+/* ── Dark mode for login/register ── */
+html.dark body { background-color: #020617; }
+html.dark .auth-page-bg { background-color: #020617; }
+
+/* Input fields — use !important to override Tailwind CDN inline utility classes */
+html.dark .form-input,
+html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="submit"]):not([type="button"]),
+html.dark select,
+html.dark textarea {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+html.dark .form-input::placeholder,
+html.dark input::placeholder,
+html.dark textarea::placeholder { color: #64748b !important; }
+
+/* Card / panel backgrounds */
+html.dark .bg-white { background-color: #0f172a !important; }
+html.dark .bg-slate-50 { background-color: #1e293b !important; }
+html.dark .bg-slate-100 { background-color: #1e293b !important; }
+html.dark .text-slate-700 { color: #cbd5e1 !important; }
+html.dark .text-slate-600 { color: #94a3b8 !important; }
+html.dark .text-slate-800 { color: #f1f5f9 !important; }
+html.dark .border-slate-200 { border-color: #334155 !important; }
+html.dark .border-slate-100 { border-color: #1e293b !important; }
+
+/* Google button */
+html.dark .hover\:bg-slate-50:hover { background-color: #1e293b !important; }
+
+/* Password show/hide button */
+html.dark .pw-toggle { color: #94a3b8; }
+html.dark .pw-toggle:hover { color: #cbd5e1; }
+
+/* Terms modal */
+html.dark #terms-modal > div { background: #0f172a; border-color: #1e293b; }
+
+/* Smooth transition */
+*, *::before, *::after { transition-property: background-color, border-color, color; transition-duration: 150ms; }

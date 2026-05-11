@@ -1,0 +1,361 @@
+/* public/css/app.css — ConnectHub shared styles + dark mode */
+
+/* ── CSS Variables (Light) ─────────────────────────── */
+:root {
+  --bg:           #f0f4f9;
+  --surface:      #ffffff;
+  --surface-2:    #f8fafc;
+  --border:       #e8edf2;
+  --border-2:     #e2e8f0;
+  --text-primary: #0f172a;
+  --text-secondary:#475569;
+  --text-muted:   #94a3b8;
+  --brand:        #0070e0;
+  --brand-hover:  #005bb5;
+  --brand-light:  #eef6ff;
+  --red:          #e5365a;
+  --green:        #16a34a;
+  --shadow-sm:    0 1px 4px rgba(0,0,0,0.06);
+  --shadow-md:    0 4px 24px rgba(0,0,0,0.07);
+  --shadow-lg:    0 8px 40px rgba(0,0,0,0.10);
+  --radius:       16px;
+  --radius-sm:    10px;
+  --radius-xs:    8px;
+  --navbar-h:     60px;
+}
+
+/* ── CSS Variables (Dark) ──────────────────────────── */
+html.dark {
+  --bg:           #0d1117;
+  --surface:      #161b22;
+  --surface-2:    #21262d;
+  --border:       #30363d;
+  --border-2:     #30363d;
+  --text-primary: #e6edf3;
+  --text-secondary:#8b949e;
+  --text-muted:   #484f58;
+  --brand:        #58a6ff;
+  --brand-hover:  #79bbff;
+  --brand-light:  #1f3148;
+  --shadow-sm:    0 1px 4px rgba(0,0,0,0.3);
+  --shadow-md:    0 4px 24px rgba(0,0,0,0.4);
+  --shadow-lg:    0 8px 40px rgba(0,0,0,0.5);
+}
+
+/* ── Base ───────────────────────────────────────────── */
+* { box-sizing: border-box; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text-primary);
+  transition: background 0.25s, color 0.25s;
+  margin: 0;
+}
+
+/* ── Navbar ─────────────────────────────────────────── */
+#navbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  height: var(--navbar-h);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex; align-items: center; padding: 0 16px;
+  transition: background 0.25s, border-color 0.25s;
+}
+
+/* ── Cards ──────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: background 0.25s, border-color 0.25s, box-shadow 0.2s;
+}
+.card:hover { box-shadow: var(--shadow-md); }
+
+/* ── Post card ─────────────────────────────────────── */
+.post-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  transition: background 0.25s, border-color 0.25s, box-shadow 0.2s;
+}
+.post-card:hover { box-shadow: var(--shadow-md); }
+
+/* ── Like button ────────────────────────────────────── */
+.like-btn.liked { color: #e5365a; }
+.like-btn:active { transform: scale(0.88); }
+.like-btn { transition: transform 0.12s, color 0.15s; }
+
+/* ── Skeleton ───────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg, var(--border) 25%, var(--surface-2) 50%, var(--border) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: var(--radius-xs);
+}
+@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+/* ── Animations ─────────────────────────────────────── */
+@keyframes fadeIn    { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
+@keyframes slideIn   { from{opacity:0;transform:translateX(8px)} to{opacity:1;transform:none} }
+@keyframes msgIn     { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+
+/* ── Notification badge ─────────────────────────────── */
+.notif-badge {
+  position: absolute; top: -4px; right: -4px;
+  background: #e5365a; color: #fff;
+  font-size: 10px; font-weight: 700;
+  min-width: 18px; height: 18px;
+  border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 4px; border: 2px solid var(--surface);
+}
+
+/* ── Comment area ───────────────────────────────────── */
+.comments-area { border-top: 1px solid var(--border); }
+.comment-item  { animation: fadeIn 0.2s ease; }
+
+/* ── Sidebar (sticky) ───────────────────────────────── */
+.sidebar {
+  position: sticky;
+  top: calc(var(--navbar-h) + 12px);
+  height: calc(100vh - var(--navbar-h) - 20px);
+  overflow-y: auto;
+}
+.sidebar::-webkit-scrollbar { width: 0; }
+
+/* ── Nav sidebar links ──────────────────────────────── */
+.nav-link {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; border-radius: 12px;
+  font-size: 14px; font-weight: 500; color: var(--text-secondary);
+  transition: background 0.15s, color 0.15s;
+  text-decoration: none;
+}
+.nav-link:hover { background: var(--surface-2); color: var(--text-primary); }
+.nav-link.active { background: var(--brand-light); color: var(--brand); font-weight: 600; }
+
+/* ── Input ──────────────────────────────────────────── */
+.input {
+  width: 100%; background: var(--surface-2); border: 1px solid transparent;
+  border-radius: var(--radius-sm); padding: 10px 16px;
+  font-size: 14px; color: var(--text-primary); outline: none;
+  transition: border-color 0.15s, background 0.15s;
+  font-family: 'DM Sans', sans-serif;
+}
+.input:focus { border-color: var(--brand); background: var(--surface); }
+.input::placeholder { color: var(--text-muted); }
+
+/* ── Textarea ───────────────────────────────────────── */
+textarea.input { resize: none; }
+
+/* ── Button variants ────────────────────────────────── */
+.btn-primary {
+  background: var(--brand); color: #fff; border: none;
+  border-radius: var(--radius-sm); padding: 8px 20px;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+  font-family: 'DM Sans', sans-serif;
+}
+.btn-primary:hover { background: var(--brand-hover); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-secondary {
+  background: var(--surface-2); color: var(--text-secondary);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 8px 20px; font-size: 14px; font-weight: 600; cursor: pointer;
+  transition: background 0.15s; font-family: 'DM Sans', sans-serif;
+}
+.btn-secondary:hover { background: var(--border); }
+
+/* ── Divider ────────────────────────────────────────── */
+.divider { border: 0; border-top: 1px solid var(--border); margin: 0; }
+
+/* ── Post image ─────────────────────────────────────── */
+.post-img { max-height: 480px; object-fit: cover; width: 100%; border-radius: var(--radius-sm); }
+
+/* ── Message bubbles (dark mode aware) ──────────────── */
+.bubble-mine {
+  background: var(--brand); color: #fff;
+  border-radius: 18px 18px 4px 18px;
+  max-width: 70%; word-break: break-word;
+}
+.bubble-theirs {
+  background: var(--surface); color: var(--text-primary);
+  border-radius: 18px 18px 18px 4px;
+  max-width: 70%; word-break: break-word;
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Dark mode text overrides ───────────────────────── */
+html.dark .text-slate-800  { color: #e6edf3 !important; }
+html.dark .text-slate-700  { color: #c9d1d9 !important; }
+html.dark .text-slate-600  { color: #8b949e !important; }
+html.dark .text-slate-500  { color: #8b949e !important; }
+html.dark .text-slate-400  { color: #6e7681 !important; }
+html.dark .bg-white        { background: #161b22 !important; }
+html.dark .bg-slate-50     { background: #21262d !important; }
+html.dark .bg-slate-100    { background: #21262d !important; }
+html.dark .border-slate-100 { border-color: #30363d !important; }
+html.dark .border-slate-200 { border-color: #30363d !important; }
+html.dark .hover\:bg-slate-50:hover  { background: #21262d !important; }
+html.dark .hover\:bg-slate-100:hover { background: #21262d !important; }
+html.dark .hover\:bg-slate-200:hover { background: #30363d !important; }
+html.dark .shadow-xl        { box-shadow: 0 8px 40px rgba(0,0,0,0.5) !important; }
+html.dark .shadow-2xl       { box-shadow: 0 16px 60px rgba(0,0,0,0.6) !important; }
+
+/* ── Mobile nav (bottom bar) ────────────────────────── */
+#mobile-nav {
+  display: none;
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 90;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 8px 0 env(safe-area-inset-bottom, 8px);
+}
+
+@media (max-width: 768px) {
+  #mobile-nav { display: flex; }
+  .sidebar    { display: none; }
+  #right-sidebar { display: none; }
+  body { padding-bottom: 60px; }
+}
+
+/* ── Scroll-to-top ──────────────────────────────────── */
+#scroll-top { transition: opacity 0.2s, transform 0.2s; }
+
+/* ── Privacy badges ─────────────────────────────────── */
+.privacy-public  { color: #16a34a; }
+.privacy-friends { color: #2563eb; }
+
+/* ── Modal backdrop ─────────────────────────────────── */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  z-index: 50; display: flex; align-items: center; justify-content: center;
+  padding: 16px; animation: fadeIn 0.15s ease;
+}
+.modal-box {
+  background: var(--surface); border-radius: var(--radius);
+  box-shadow: var(--shadow-lg); width: 100%; max-width: 480px;
+  max-height: 90vh; overflow-y: auto; padding: 24px;
+  animation: fadeIn 0.15s ease;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ISO 9241-110  — Dialogue Principles (clarity, feedback, error prevention)
+   ISO/IEC 25010 — Usability, Accessibility, Reliability
+   ISO/IEC 27001 — Secure UX patterns (no sensitive data exposure)
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Focus visibility (ISO 9241-171 accessibility) ── */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Skip-to-content (accessibility, ISO 9241-171) ── */
+.skip-link {
+  position: absolute; top: -40px; left: 8px; z-index: 9999;
+  background: var(--brand); color: #fff; padding: 8px 16px;
+  border-radius: 0 0 8px 8px; font-size: 13px; font-weight: 600;
+  transition: top .15s;
+}
+.skip-link:focus { top: 0; }
+
+/* ── Reduced motion (ISO 9241-11 user preferences) ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── High contrast improvement (ISO 9241-303 visual ergonomics) ── */
+.post-card { border: 1px solid var(--border); }
+.post-card:focus-within { border-color: var(--brand); }
+
+/* ── Error states (ISO 9241-110 error prevention, ISO/IEC 25010 reliability) ── */
+.field-error {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239,68,68,.12);
+}
+.field-error-msg {
+  color: #ef4444; font-size: 11.5px; margin-top: 3px;
+  display: flex; align-items: center; gap: 4px;
+}
+
+/* ── Success states ── */
+.field-success { border-color: #22c55e !important; }
+
+/* ── Loading skeleton improvements (ISO 9241-12 information presentation) ── */
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+}
+@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+/* ── Toast notifications (ISO 9241-110 feedback) ── */
+.toast-container {
+  position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+  display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+}
+.toast {
+  padding: 10px 16px; border-radius: 12px; font-size: 13px; font-weight: 500;
+  box-shadow: 0 8px 24px rgba(0,0,0,.18); pointer-events: all;
+  display: flex; align-items: center; gap: 8px; max-width: 340px;
+  animation: toastIn .2s ease; backdrop-filter: blur(8px);
+}
+.toast.success { background: #16a34a; color: #fff; }
+.toast.error   { background: #dc2626; color: #fff; }
+.toast.info    { background: var(--brand); color: #fff; }
+.toast.warning { background: #d97706; color: #fff; }
+@keyframes toastIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:none} }
+
+/* ── Secure form patterns (ISO/IEC 27001 — no accidental data exposure) ── */
+input[autocomplete="off"],
+input[type="password"] { -webkit-text-security: disc; }
+
+/* ── Content warning overlay (ISO 9241-110 user control) ── */
+.content-warning {
+  position: relative; overflow: hidden;
+  filter: blur(8px); user-select: none; pointer-events: none;
+  transition: filter .2s;
+}
+.content-warning-overlay {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; z-index: 2;
+  background: rgba(0,0,0,.4); color: #fff; gap: 8px; text-align: center;
+  border-radius: inherit; padding: 16px;
+}
+
+/* ── Moderation status badges (ISO/IEC 25010 — visibility of system status) ── */
+.badge-approved { background:#dcfce7; color:#15803d; border:1px solid #86efac; }
+.badge-pending  { background:#fef9c3; color:#854d0e; border:1px solid #fde047; }
+.badge-rejected { background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; }
+.badge-auto     { background:#ede9fe; color:#6d28d9; border:1px solid #c4b5fd; }
+.mod-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; font-weight: 700; padding: 2px 8px;
+  border-radius: 20px; text-transform: uppercase; letter-spacing: .03em;
+}
+
+/* ── ISO/IEC 25010 Usability: button affordance improvements ── */
+button:not(:disabled):active { transform: scale(.96); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ── Responsive typography (ISO 9241-303) ── */
+@media (max-width: 640px) {
+  .text-2xl { font-size: 1.25rem; }
+  .text-xl  { font-size: 1.1rem; }
+}
+
+/* ── Print styles (ISO/IEC 25010 portability) ── */
+@media print {
+  header, #left-sidebar, #right-sidebar, .msg-react-trigger,
+  button, .ai-tool-btn { display: none !important; }
+  .post-card { break-inside: avoid; border: 1px solid #ccc; }
+}

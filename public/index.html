@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PGA-DAMIS — Dormitory Application</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="/css/auth.css"/>
+  <script>
+    // Apply dark mode immediately to avoid flash
+    if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.add('dark');
+    }
+  </script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Plus Jakarta Sans','sans-serif'] },
+          colors: { brand: { 50:'#eff6ff',100:'#dbeafe',200:'#bfdbfe',400:'#60a5fa',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8' } }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="min-h-screen bg-slate-100 dark:bg-slate-950 font-sans flex items-center justify-center p-4 transition-colors">
+
+<!-- Dark mode toggle -->
+<button onclick="toggleDark()" id="dark-btn" title="Toggle dark mode"
+  class="fixed top-4 right-4 z-50 w-9 h-9 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-center text-slate-500 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+  <i id="dark-icon" class="fa-solid fa-moon text-sm"></i>
+</button>
+
+<!-- TERMS MODAL -->
+<div id="terms-modal" class="fixed inset-0 z-50 hidden items-center justify-center modal-bg p-4">
+  <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg anim-pop">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+      <h3 class="font-extrabold text-slate-800 text-lg">Terms &amp; Conditions</h3>
+      <button onclick="closeTerms()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500"><i class="fa-solid fa-xmark text-sm"></i></button>
+    </div>
+    <div class="terms-body px-6 py-4 text-sm text-slate-600 leading-relaxed space-y-3">
+      <p class="font-bold text-slate-700">Last updated: January 2025</p>
+      <p>Welcome to <strong>PGA-DAMIS</strong>. By submitting a dormitory application, you agree to the following terms.</p>
+      <h4 class="font-bold text-slate-700 mt-2">1. Eligibility</h4>
+      <p>You must be at least <strong>18 years old</strong> to apply for dormitory accommodation. Applicants under 18 must have guardian consent.</p>
+      <h4 class="font-bold text-slate-700">2. Account Responsibility</h4>
+      <p>You are responsible for maintaining the confidentiality of your password.</p>
+      <h4 class="font-bold text-slate-700">3. Acceptable Use</h4>
+      <p>You agree not to post harmful, offensive, or illegal content.</p>
+      <h4 class="font-bold text-slate-700">4. Privacy &amp; Data</h4>
+      <p>Your data is encrypted and used solely for identity verification. We do not sell your data.</p>
+      <h4 class="font-bold text-slate-700">5. Identity Verification</h4>
+      <p>A valid government ID is required to unlock full features. Your ID is never displayed publicly.</p>
+      <h4 class="font-bold text-slate-700">6. Termination</h4>
+      <p>We reserve the right to terminate accounts that violate these Terms without prior notice.</p>
+      <p class="text-slate-400 text-xs pt-2">PGA-DAMIS — Provincial Government of Aurora © 2025</p>
+    </div>
+    <div class="px-6 py-4 border-t border-slate-100 flex gap-3">
+      <button onclick="closeTerms()" class="flex-1 border border-slate-200 text-slate-500 font-bold py-2.5 rounded-xl text-sm hover:bg-slate-50">Close</button>
+      <button onclick="acceptTerms()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm">I Agree</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN CARD -->
+<div class="w-full max-w-5xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden flex min-h-[600px]">
+
+  <!-- LEFT BRAND PANEL -->
+  <div class="brand-panel hidden md:flex flex-col justify-between w-[42%] p-10 text-white relative z-10">
+    <div class="brand-dots"></div>
+    <div class="relative z-10 flex items-center gap-3">
+      <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+        <i class="fa-solid fa-people-group text-white text-lg"></i>
+      </div>
+      <span class="text-xl font-extrabold tracking-tight">PGA-DAMIS</span>
+    </div>
+    <div class="relative z-10 space-y-5">
+      <div class="w-12 h-1 bg-white/40 rounded-full"></div>
+      <h2 class="text-3xl font-extrabold leading-snug">Apply.<br/>Verify.<br/>Reside.</h2>
+      <p class="text-white/65 text-sm leading-relaxed">Provincial Government of Aurora Dormitory Application Management and Information System.</p>
+      <div class="space-y-3 pt-1">
+        <div class="flex items-center gap-3 text-sm text-white/75">
+          <div class="w-7 h-7 rounded-full bg-white/15 flex items-center justify-center flex-shrink-0"><i class="fa-solid fa-shield-halved text-xs"></i></div>
+          Identity-verified applicants only
+        </div>
+        <div class="flex items-center gap-3 text-sm text-white/75">
+          <div class="w-7 h-7 rounded-full bg-white/15 flex items-center justify-center flex-shrink-0"><i class="fa-solid fa-envelope-circle-check text-xs"></i></div>
+          Real email OTP verification
+        </div>
+        <div class="flex items-center gap-3 text-sm text-white/75">
+          <div class="w-7 h-7 rounded-full bg-white/15 flex items-center justify-center flex-shrink-0"><i class="fa-solid fa-certificate text-xs"></i></div>
+          ISO/IEC 25010:2023 Quality Standard
+        </div>
+      </div>
+    </div>
+    <p class="relative z-10 text-white/35 text-xs">© 2026 PGA-DAMIS · Provincial Government of Aurora</p>
+    <a href="mailto:support@pgadamis.gov.ph" id="support-link"
+       class="relative z-10 mt-3 flex items-center gap-2 text-white/50 hover:text-white/80 text-xs transition-colors cursor-pointer"
+       onclick="event.preventDefault();showSupportInfo()">
+      <i class="fa-solid fa-headset"></i> Need help? Contact Support
+    </a>
+  </div>
+
+  <!-- RIGHT FORM PANEL -->
+  <div class="flex-1 flex flex-col overflow-hidden bg-white dark:bg-slate-900 transition-colors">
+    <div class="flex border-b border-slate-100 dark:border-slate-700 flex-shrink-0 bg-white dark:bg-slate-900">
+      <button id="tab-login" onclick="showTab('login')" class="flex-1 py-4 text-sm font-bold text-blue-600 border-b-2 border-blue-600 transition-all dark:text-blue-400">Log In</button>
+      <button id="tab-signup" onclick="showTab('signup')" class="flex-1 py-4 text-sm font-bold text-slate-400 dark:text-slate-500 border-b-2 border-transparent hover:text-slate-600 dark:hover:text-slate-300 transition-all">Create Account</button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto">
+
+      <!-- ═══ LOGIN ═══ -->
+      <div id="panel-login" class="p-8 anim-fade-up">
+        <h1 class="text-2xl font-extrabold text-slate-800 dark:text-white mb-1">Welcome back 👋</h1>
+        <p class="text-slate-400 text-sm mb-6">Sign in to your PGA-DAMIS account.</p>
+
+        <button onclick="handleGoogleAuth('login')"
+          class="w-full flex items-center justify-center gap-3 border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 rounded-xl py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:border-slate-300 mb-5 transition-all">
+          <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#4285F4" d="M44.5 20H24v8.5h11.7C34.2 33.6 29.7 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.7 1.1 7.8 2.9l6-6C34.5 6.5 29.6 4.5 24 4.5 12.7 4.5 3.5 13.7 3.5 25S12.7 45.5 24 45.5c10.7 0 20-7.7 20-20.5 0-1.3-.1-2.7-.5-5z"/><path fill="#34A853" d="M6.3 14.7l7 5.1C15 16 19.2 13 24 13c3 0 5.7 1.1 7.8 2.9l6-6C34.5 6.5 29.6 4.5 24 4.5c-7.7 0-14.3 4.4-17.7 10.2z"/><path fill="#FBBC05" d="M24 45.5c5.6 0 10.4-1.9 14.2-5.1l-6.6-5.4C29.8 36.8 27 37.5 24 37.5c-5.7 0-10.5-3.8-12.2-9l-6.9 5.3C8.2 41.2 15.5 45.5 24 45.5z"/><path fill="#EA4335" d="M44.5 20H24v8.5h11.7c-.8 2.3-2.2 4.2-4.1 5.6l6.6 5.4c3.9-3.6 6.3-8.9 6.3-15 0-1.3-.1-2.7-.5-5z"/></svg>
+          Continue with Google
+        </button>
+
+        <div class="flex items-center gap-3 mb-5"><div class="flex-1 h-px bg-slate-200 dark:bg-slate-700"></div><span class="text-xs text-slate-400 dark:text-slate-600 font-medium">or use email</span><div class="flex-1 h-px bg-slate-100 dark:bg-slate-700"></div></div>
+
+        <div class="mb-4">
+          <label class="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Email Address</label>
+          <div class="relative"><i class="fa-solid fa-envelope absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 text-sm"></i>
+            <input id="login-email" type="email" placeholder="you@email.com" autocomplete="email" onkeydown="if(event.key==='Enter'){event.preventDefault();$('login-pass').focus();}" class="form-input pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-500 transition-colors"/></div>
+        </div>
+        <div class="mb-2">
+          <label class="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Password</label>
+          <div class="relative"><i class="fa-solid fa-lock absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 text-sm"></i>
+            <input id="login-pass" type="password" placeholder="Your password" autocomplete="current-password" onkeydown="if(event.key==='Enter' && $('panel-forgot').classList.contains('hidden'))handleLogin()" class="form-input pl-10 pr-10 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-500 transition-colors"/>
+            <button type="button" onclick="toggleVis('login-pass',this)" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500"><i class="fa-solid fa-eye text-sm"></i></button></div>
+        </div>
+        <div class="flex justify-end mb-5"><button type="button" onclick="showForgot()" class="text-xs text-blue-600 font-semibold hover:underline">Forgot password?</button></div>
+
+        <div id="login-err" class="hidden mb-4 p-3 bg-red-50 border border-red-100 rounded-xl text-red-500 text-sm flex items-start gap-2" role="alert">
+          <i class="fa-solid fa-circle-exclamation mt-0.5 flex-shrink-0"></i><span id="login-err-txt"></span></div>
+
+        <button id="btn-login" onclick="handleLogin()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl text-sm shadow-lg shadow-blue-200 transition-all">Sign In</button>
+        <p class="text-center text-sm text-slate-400 mt-5">Don't have an account? <button onclick="showTab('signup')" class="text-blue-600 font-semibold hover:underline">Create one free</button></p>
+      </div>
+
+      <!-- ═══ SIGN UP ═══ -->
+      <div id="panel-signup" class="hidden">
+
+        <!-- Progress dots -->
+        <div class="px-8 pt-5 pb-0">
+          <div class="flex justify-between items-center mb-3">
+            <div class="flex items-center gap-1.5"><div id="dot1" class="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">1</div><span id="lbl1" class="text-xs font-bold text-blue-600 hidden sm:inline">Account</span></div>
+            <div class="flex-1 h-px bg-slate-100 mx-1"></div>
+            <div class="flex items-center gap-1.5"><div id="dot2" class="w-6 h-6 rounded-full bg-slate-200 text-slate-400 text-xs font-bold flex items-center justify-center">2</div><span id="lbl2" class="text-xs font-semibold text-slate-300 hidden sm:inline">Email OTP</span></div>
+            <div class="flex-1 h-px bg-slate-100 mx-1"></div>
+            <div class="flex items-center gap-1.5"><div id="dot3" class="w-6 h-6 rounded-full bg-slate-200 text-slate-400 text-xs font-bold flex items-center justify-center">3</div><span id="lbl3" class="text-xs font-semibold text-slate-300 hidden sm:inline">Application</span></div>
+            <div class="flex-1 h-px bg-slate-100 mx-1"></div>
+            <div class="flex items-center gap-1.5"><div id="dot4" class="w-6 h-6 rounded-full bg-slate-200 text-slate-400 text-xs font-bold flex items-center justify-center">4</div><span id="lbl4" class="text-xs font-semibold text-slate-300 hidden sm:inline">Profile</span></div>
+            <div class="flex-1 h-px bg-slate-100 mx-1"></div>
+            <div class="flex items-center gap-1.5"><div id="dot5" class="w-6 h-6 rounded-full bg-slate-200 text-slate-400 text-xs font-bold flex items-center justify-center">5</div><span id="lbl5" class="text-xs font-semibold text-slate-300 hidden sm:inline">Documents</span></div>
+          </div>
+          <div class="w-full bg-slate-100 rounded-full h-1 mb-5"><div id="prog-bar" class="step-bar h-1 bg-blue-600 rounded-full" style="width:20%"></div></div>
+        </div>
+
+        <!-- ── STEP 1: Account ── -->
+        <div id="step-1" class="px-8 pb-8 anim-fade-up">
+          <h2 class="text-xl font-extrabold text-slate-800 mb-1">Create your account</h2>
+          <p class="text-slate-400 text-sm mb-5">Start with your email and a strong password.</p>
+
+          <button id="btn-google-signup" onclick="handleGoogleAuth('signup')"
+            class="w-full flex items-center justify-center gap-3 border border-slate-200 rounded-xl py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 mb-5 transition-all">
+            <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#4285F4" d="M44.5 20H24v8.5h11.7C34.2 33.6 29.7 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.7 1.1 7.8 2.9l6-6C34.5 6.5 29.6 4.5 24 4.5 12.7 4.5 3.5 13.7 3.5 25S12.7 45.5 24 45.5c10.7 0 20-7.7 20-20.5 0-1.3-.1-2.7-.5-5z"/><path fill="#34A853" d="M6.3 14.7l7 5.1C15 16 19.2 13 24 13c3 0 5.7 1.1 7.8 2.9l6-6C34.5 6.5 29.6 4.5 24 4.5c-7.7 0-14.3 4.4-17.7 10.2z"/><path fill="#FBBC05" d="M24 45.5c5.6 0 10.4-1.9 14.2-5.1l-6.6-5.4C29.8 36.8 27 37.5 24 37.5c-5.7 0-10.5-3.8-12.2-9l-6.9 5.3C8.2 41.2 15.5 45.5 24 45.5z"/><path fill="#EA4335" d="M44.5 20H24v8.5h11.7c-.8 2.3-2.2 4.2-4.1 5.6l6.6 5.4c3.9-3.6 6.3-8.9 6.3-15 0-1.3-.1-2.7-.5-5z"/></svg>
+            Sign up with Google
+          </button>
+
+          <!-- Shown after returning from Google OAuth for a NEW user -->
+          <div id="google-banner" class="hidden mb-5 p-3.5 bg-blue-50 border border-blue-200 rounded-xl">
+            <div class="flex items-start gap-3">
+              <svg class="flex-shrink-0 mt-0.5 w-5 h-5" viewBox="0 0 48 48"><path fill="#4285F4" d="M44.5 20H24v8.5h11.7C34.2 33.6 29.7 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.7 1.1 7.8 2.9l6-6C34.5 6.5 29.6 4.5 24 4.5 12.7 4.5 3.5 13.7 3.5 25S12.7 45.5 24 45.5c10.7 0 20-7.7 20-20.5 0-1.3-.1-2.7-.5-5z"/><path fill="#34A853" d="M6.3 14.7l7 5.1C15 16 19.2 13 24 13c3 0 5.7 1.1 7.8 2.9l6-6C34.5 6.5 29.6 4.5 24 4.5c-7.7 0-14.3 4.4-17.7 10.2z"/><path fill="#FBBC05" d="M24 45.5c5.6 0 10.4-1.9 14.2-5.1l-6.6-5.4C29.8 36.8 27 37.5 24 37.5c-5.7 0-10.5-3.8-12.2-9l-6.9 5.3C8.2 41.2 15.5 45.5 24 45.5z"/><path fill="#EA4335" d="M44.5 20H24v8.5h11.7c-.8 2.3-2.2 4.2-4.1 5.6l6.6 5.4c3.9-3.6 6.3-8.9 6.3-15 0-1.3-.1-2.7-.5-5z"/></svg>
+              <div>
+                <p class="text-sm font-bold text-blue-700">Google account connected ✓</p>
+                <p id="google-banner-email" class="text-xs font-mono text-blue-600 mt-0.5 mb-1.5"></p>
+                <p class="text-xs text-blue-600 leading-relaxed">Your Google identity is recognised, but you still need to complete registration. We'll send a one-time code to your Gmail to verify ownership, then you'll fill in your personal details and upload a government ID.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3 mb-5"><div class="flex-1 h-px bg-slate-100 dark:bg-slate-700"></div><span class="text-xs text-slate-400 dark:text-slate-600 font-medium">or use email</span><div class="flex-1 h-px bg-slate-100 dark:bg-slate-700"></div></div>
+
+          <div class="mb-4">
+            <label class="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1.5" for="reg-email">Email Address <span class="text-red-400">*</span></label>
+            <div class="relative"><i class="fa-solid fa-envelope absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 text-sm"></i>
+              <input id="reg-email" type="email" placeholder="you@email.com" autocomplete="email" oninput="clearEmailTakenMsg()"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();$('reg-pass').focus();}"
+                class="form-input pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-500 transition-colors"/></div>
+            <!-- Inline email-already-taken message — stays under the field, no navigation -->
+            <div id="email-taken-msg" class="hidden mt-2 p-2.5 bg-red-50 border border-red-100 rounded-lg flex items-start gap-2">
+              <i class="fa-solid fa-circle-exclamation text-red-400 mt-0.5 flex-shrink-0 text-xs"></i>
+              <span id="email-taken-txt" class="text-xs text-red-600 font-medium leading-snug"></span>
+            </div>
+          </div>
+
+          <!-- Password fields — hidden while Google signup is active -->
+          <div id="pass-fields">
+            <div class="mb-3">
+              <label class="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1.5" for="reg-pass">Password <span class="text-red-400">*</span></label>
+              <div class="relative"><i class="fa-solid fa-lock absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 text-sm"></i>
+                <input id="reg-pass" type="password" placeholder="Create a strong password" autocomplete="new-password" oninput="evalPass(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();$('reg-conf').focus();}"
+                  class="form-input pl-10 pr-10 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-500 transition-colors"/>
+                <button type="button" onclick="toggleVis('reg-pass',this)" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500"><i class="fa-solid fa-eye text-sm"></i></button></div>
+              <div class="flex gap-1 mt-2"><div id="seg1" class="seg flex-1"></div><div id="seg2" class="seg flex-1"></div><div id="seg3" class="seg flex-1"></div><div id="seg4" class="seg flex-1"></div></div>
+              <p id="str-lbl" class="text-xs mt-1 h-4"></p>
+              <div class="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
+                <div class="req-item bad flex items-center gap-1.5 text-xs" id="req-len"><i class="fa-solid fa-circle-dot text-[10px]"></i> At least 8 characters</div>
+                <div class="req-item bad flex items-center gap-1.5 text-xs" id="req-upper"><i class="fa-solid fa-circle-dot text-[10px]"></i> One uppercase (A–Z)</div>
+                <div class="req-item bad flex items-center gap-1.5 text-xs" id="req-lower"><i class="fa-solid fa-circle-dot text-[10px]"></i> One lowercase (a–z)</div>
+                <div class="req-item bad flex items-center gap-1.5 text-xs" id="req-num"><i class="fa-solid fa-circle-dot text-[10px]"></i> One number (0–9)</div>
+                <div class="req-item bad flex items-center gap-1.5 text-xs" id="req-sym"><i class="fa-solid fa-circle-dot text-[10px]"></i> One symbol (!@#$%...)</div>
+                <div class="req-item bad flex items-center gap-1.5 text-xs" id="req-ns"><i class="fa-solid fa-circle-dot text-[10px]"></i> No spaces allowed</div>
+              </div>
+            </div>
+            <div class="mb-6">
+              <label class="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1.5" for="reg-conf">Confirm Password <span class="text-red-400">*</span></label>
+              <div class="relative"><i class="fa-solid fa-lock absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 text-sm"></i>
+                <input id="reg-conf" type="password" placeholder="Repeat your password" autocomplete="new-password" oninput="checkMatch()" onkeydown="if(event.key==='Enter'){event.preventDefault();go(1);}"
+                  class="form-input pl-10 pr-10 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-500 transition-colors"/>
+                <button type="button" onclick="toggleVis('reg-conf',this)" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500"><i class="fa-solid fa-eye text-sm"></i></button></div>
+              <p id="match-msg" class="text-xs mt-1 h-4"></p>
+            </div>
+          </div>
+
+          <div id="err-1" class="hidden mb-4 p-3 bg-red-50 border border-red-100 rounded-xl text-red-500 text-sm flex items-start gap-2" role="alert">
+            <i class="fa-solid fa-circle-exclamation mt-0.5 flex-shrink-0"></i><span id="err-1-txt"></span></div>
+
+          <button id="btn-step1" onclick="go(1)" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl text-sm shadow-lg shadow-blue-200 transition-all">
+            Continue <i class="fa-solid fa-arrow-right ml-1.5"></i></button>
+          <p class="text-center text-sm text-slate-400 mt-4">Already have an account? <button onclick="showTab('login')" class="text-blue-600 font-semibold hover:underline">Log in</button></p>
+        </div>
+
+        <!-- ── STEP 2: Email OTP ── -->
+        <div id="step-2" class="hidden px-8 pb-8 anim-slide-in">
+          <div class="flex flex-col items-center text-center mb-6">
+            <div class="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-3 mt-2">
+              <i class="fa-solid fa-envelope-circle-check text-3xl text-blue-600"></i>
+            </div>
+            <h2 class="text-xl font-extrabold text-slate-800 mb-1">Check Your Email</h2>
+            <p class="text-slate-400 text-sm">We sent a <strong class="text-slate-600">6-digit code</strong> to<br/><span id="otp-email" class="text-blue-600 font-bold"></span></p>
+          </div>
+
+          <div class="flex justify-center gap-2 mb-4" role="group" aria-label="Enter verification code">
+            <input class="otp-box" id="o1" type="text" maxlength="1" inputmode="numeric" autocomplete="one-time-code"
+              oninput="otpMove(this,null,'o2')" onkeydown="otpBack(event,null)"
+              onpaste="otpPaste(event)" aria-label="Digit 1"/>
+            <input class="otp-box" id="o2" type="text" maxlength="1" inputmode="numeric"
+              oninput="otpMove(this,'o1','o3')" onkeydown="otpBack(event,'o1')"
+              onpaste="otpPaste(event)" aria-label="Digit 2"/>
+            <input class="otp-box" id="o3" type="text" maxlength="1" inputmode="numeric"
+              oninput="otpMove(this,'o2','o4')" onkeydown="otpBack(event,'o2')"
+              onpaste="otpPaste(event)" aria-label="Digit 3"/>
+            <input class="otp-box" id="o4" type="text" maxlength="1" inputmode="numeric"
+              oninput="otpMove(this,'o3','o5')" onkeydown="otpBack(event,'o3')"
+              onpaste="otpPaste(event)" aria-label="Digit 4"/>
+            <input class="otp-box" id="o5" type="text" maxlength="1" inputmode="numeric"
+              oninput="otpMove(this,'o4','o6')" onkeydown="otpBack(event,'o4')"
+              onpaste="otpPaste(event)" aria-label="Digit 5"/>
+            <input class="otp-box" id="o6" type="text" maxlength="1" inputmode="numeric"
+              oninput="otpMove(this,'o5',null)" onkeydown="otpBack(event,'o5')"
+              onpaste="otpPaste(event)" aria-label="Digit 6"/>
+          </div>
+
+          <div class="text-center mb-5">
+            <p id="resend-timer" class="text-xs text-slate-400">Resend available in <strong id="cd" class="text-slate-600">60</strong>s</p>
+            <button id="resend-btn" onclick="resendOTP()" class="hidden text-xs text-blue-600 font-semibold hover:underline">Resend Code</button>
+          </div>
+
+          <div id="err-2" class="hidden mb-4 p-3 bg-red-50 border border-red-100 rounded-xl text-red-500 text-sm flex items-start gap-2" role="alert">
+            <i class="fa-solid fa-circle-exclamation mt-0.5 flex-shrink-0"></i><span id="err-2-txt"></span></div>
+
+          <button id="btn-verify" onclick="verifyOTP()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl text-sm shadow-lg shadow-blue-200 transition-all mb-3">
+            Verify &amp; Continue <i class="fa-solid fa-arrow-right ml-1"></i></button>
+          <button onclick="back(2)" class="w-full border border-slate-200 text-slate-500 font-bold py-3 rounded-xl text-sm hover:bg-slate-50 transition-all">
+            <i class="fa-solid fa-arrow-left mr-1"></i> Back</button>
+        </div>
+
+        <!-- ── STEP 3: Resident’s Application Form ── -->
+        <div id="step-3" class="hidden px-8 pb-8 anim-slide-in">
+          <h2 class="text-xl font-extrabold text-slate-800 dark:text-white mb-1">Resident's Application Form</h2>
+          <p class="text-slate-400 text-sm mb-5">Fields marked <span class="text-red-400">*</span> are required.</p>
+
+          <!-- ─────────────────────────────────────── -->
+          <!-- PERSONAL INFORMATION                    -->
+          <!-- ─────────────────────────────────────── -->
+          <div class="mb-6">
+            <div class="flex items-center gap-2 mb-4 pb-2 border-b-2 border-blue-100">
+              <div class="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                <i class="fa-solid fa-user text-blue-500 text-sm"></i></div>
+              <p class="text-sm font-extrabold text-slate-600 uppercase tracking-widest">Personal Information</p>
+            </div>
+
+            <!-- Row: First / Middle / Last / Suffix -->
+            <div class="grid grid-cols-4 gap-2 mb-3">
+              <div class="col-span-1">
+                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">First Name <span class="text-red-400">*</span></label>
+                <input id="reg-fname" type="text" placeholder="Juan" autocomplete="given-name" oninput="blockInvalidNameChars(this)" onblur="validateNameInline('reg-fname','fname-err')"
+                  class="form-input w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-100 placeholder:text-slate-300 transition-colors"/>
+                <p id="fname-err" class="hidden text-xs text-red-500 mt-1"></p>
+              </div>
+              <div class="col-span-1">
+                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Middle Name <span class="text-slate-300 font-normal">(opt.)</span></label>
+                <input id="reg-mname" type="text" placeholder="Santos" autocomplete="additional-name" oninput="blockInvalidNameChars(this)"
+                  class="form-input w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-100 placeholder:text-slate-300 transition-colors"/>
+              </div>
+              <div class="col-span-1">
+                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Last Name <span class="text-red-400">*</span></label>
+                <input id="reg-lname" type="text" placeholder="Dela Cruz" autocomplete="family-name" oninput="blockInvalidNameChars(this)" onblur="validateNameInline('reg-lname','lname-err')"
+                  class="form-input w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-100 placeholder:text-slate-300 transition-colors"/>
+                <p id="lname-err" class="hidden text-xs text-red-500 mt-1"></p>
+              </div>
+              <div class="col-span-1">
+                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Suffix <span class="text-slate-300 font-normal">(opt.)</span></label>
+                <select id="reg-suffix" class="form-input w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-100 appearance-none transition-colors">
+                  <option value="">&#8212; None &#8212;</option><option>Jr.</option><option>Sr.</option><option>II</option><option>III</option><option>IV</option></select>
+              </div>
+            </div>
+
+            <!-- Row: Date of Birth / Civil Status -->
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Date of Birth <span class="text-red-400">*</span> <span class="text-slate-400 font-normal text-xs">&#8212; must be 13+</span></label>
+                <div class="relative"><i class="fa-solid fa-calendar absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 text-sm"></i>
+                  <input id="reg-bday" type="date" class="form-input w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-100 transition-colors"/></div>
+                <p id="age-msg" class="text-xs mt-1 h-4"></p>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Civil Status <span class="text-red-400">*</span></label>
+                <select id="reg-civil" class="form-input w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-100 appearance-none transition-colors">
+                  <option value="">&#8212; Select &#8212;</option><option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option><option>Annulled</option></select>
+              </div>
+            </div>
+
+            <!-- Sex at Birth -->
+            <div class="mb-3">
+              <label class="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Sex at Birth <span class="text-red-400">*</span></label>
+              <div class="grid grid-cols-2 gap-3">
+                <label class="flex flex-col items-center gap-1 p-2.5 rounded-xl border-2 border-slate-100 cursor-pointer hover:border-blue-400 has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50 transition-all">
+                  <input type="radio" name="sex" value="male" class="sr-only"/><i class="fa-solid fa-mars text-blue-400 text-base"></i><span class="text-xs font-semibold text-slate-600">Male</span></label>
+                <label class="flex flex-col items-center gap-1 p-2.5 rounded-xl border-2 border-slate-100 cursor-pointer hover:border-blue-400 has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50 transition-all">
+                  <input type="radio" name="sex" value="female" class="sr-only"/><i class="fa-solid fa-venus text-pink-400 text-base"></i><span class="text-xs font-semibold text-slate-600">Female</span></label>
+              </div>
+            </div>
+
+            <!-- Permanent Address (first) -->
+            <div class="mb-3">
+              <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5"><i class="fa-solid fa-house text-green-500 mr-1"></i>Permanent Address <span class="text-red-400">*</span></label>
+              <div class="space-y-2" id="perm-addr-fields">
+                <div class="relative"><select id="perm-region" onchange="loadAddrCascade('perm','province')"
+                  class="form-input w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-100 appearance-none pr-8 transition-colors">
+                  <option value="">&#8212; Select Region &#8212;</option></select>
+                  <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs pointer-events-none"></i></div>
+                <div class="relative"><select id="perm-province" onchange="loadAddrCascade('perm','city')" disabled
+                  class="form-input w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-600 appearance-none pr-8 disabled:opacity-50 transition-colors">
+                  <option value="">&#8212; Select Province &#8212;</option></select>
+                  <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs pointer-events-none"></i></div>
+                <div class="relative"><select id="perm-city" onchange="loadAddrCascade('perm','brgy')" disabled
+                  class="form-input w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-600 appearance-none pr-8 disabled:opacity-50 transition-colors">
+                  <option value="">&#8212; Select City / Municipality &#8212;</option></select>
+                  <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs pointer-events-none"></i></div>
+                <div class="relative"><select id="perm-brgy" onchange="buildAddrString('perm')" disabled
+                  class="form-input w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-600 appearance-none pr-8 disabled:opacity-50 transition-colors">
+                  <option value="">&#8212; Select Barangay &#8212;</option></select>
+                  <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs pointer-events-none"></i></div>
+                <input id="perm-addr-hidden" type="hidden" value=""/>
+              </div>
+            </div>
+
+            <!-- Present Address (with "same as permanent" toggle) -->
+            <div class="mb-3">
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300"><i class="fa-solid fa-location-dot text-blue-500 mr-1"></i>Present Address <span class="text-red-400">*</span></label>
+                <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-500 font-semibold select-none">
+                  <input type="checkbox" id="same-as-permanent" onchange="toggleSameAsPermanent()" class="w-4 h-4 accent-blue-600"/>
+                  Same as Permanent
+                </label>
+              </div>
+              <div class="space-y-2" id="pres-addr-fields">
+                <div class="relative"><select id="pres-region" onchange="loadAddrCascade('pres','province')"
+                  class="form-input w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-100 appearance-none pr-8 transition-colors">
+                  <option value="">&#8212; Select Region &#8212;</option></select>
+                  <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs pointer-events-none"></i></div>
+                <div class="relative"><select id="pres-province" onchange="loadAddrCascade('pres','city')" disabled
+                  class="form-input w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-600 appearance-none pr-8 disabled:opacity-50 transition-colors">
+                  <option value="">&#8212; Select Province &#8212;</option></select>
+                  <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs pointer-events-none"></i></div>
+                <div class="relative"><select id="pres-city" onchange="loadAddrCascade('pres','brgy')" disabled
+                  class="form-input w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-600 appearance-none pr-8 disabled:opacity-50 transition-colors">
+                  <option value="">&#8212; Select City / Municipality &#8212;</option></select>
+                  <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs pointer-events-none"></i></div>
+                <div class="relative"><select id="pres-brgy" onchange="buildAddrString('pres')" disabled
+                  class="form-input w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-600 appearance-none pr-8 disabled:opacity-50 transition-colors">
+                  <option value="">&#8212; Select Barangay &#8212;</option></select>
+                  <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs pointer-events-none"></i></div>
+                <input id="pres-addr-hidden" type="hidden" value=""/>
+              </div>
+            </div>
+
+            <!-- Phone Number -->
+            <div class="mb-3">
+              <label class="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1.5" for="reg-phone">Phone Number <span class="text-red-400">*</span></label>
+              <div class="flex rounded-xl overflow-hidden border border-slate-200 bg-slate-50 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                <span class="flex items-center gap-1.5 px-3 bg-slate-100 border-r border-slate-200 text-sm font-semibold text-slate-600 select-none whitespace-nowrap">&#127477;&#127469; +63</span>
+                <input id="reg-phone" type="tel" placeholder="9171234567" autocomplete="tel" maxlength="10"
+                  oninput="formatPhone(this); checkPhoneAvailability(this.value.replace(/\D/g,''))" onblur="validatePhoneInline()"
+                  class="flex-1 px-3 py-3 bg-transparent text-sm text-slate-700 placeholder:text-slate-300 outline-none"/>
+                <i id="phone-ok-icon" class="fa-solid fa-circle-check self-center pr-3 text-green-500 hidden"></i>
+              </div>
+              <div class="flex justify-between items-center mt-1.5">
+                <p id="phone-hint" class="text-xs text-slate-400">Enter 10 digits after +63 (e.g. 9171234567)</p>
+                <span id="phone-digit-count" class="text-xs text-slate-400">0/10</span>
+              </div>
+              <p id="phone-err-msg" class="hidden text-xs mt-1.5 text-red-500 font-medium"></p>
+            </div>
+
+            <!-- Email Address (read-only from step 1) — HIDDEN: email already confirmed via OTP -->
+            <div class="mb-1" style="display:none" aria-hidden="true">
+              <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Email Address <span class="text-red-400">*</span></label>
+              <div class="relative"><i class="fa-solid fa-envelope absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 text-sm"></i>
+                <input id="reg-email-display" type="email" readonly
+                  class="form-input w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-100 dark:bg-slate-700 text-sm text-slate-500 cursor-default"/>
+              </div>
+              <p class="text-xs text-slate-400 mt-1">Auto-filled from your registered email address.</p>
+            </div>
+          </div>
+
+          <!-- ─────────────────────────────────────── -->
+          <!-- SCHOOL INFORMATION                      -->
+          <!-- ─────────────────────────────────────── -->
+          <div class="mb-6">
+            <div class="flex items-center gap-2 mb-4 pb-2 border-b-2 border-indigo-100">
+              <div class="w-7 h-7 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                <i class="fa-solid fa-graduation-cap text-indigo-500 text-sm"></i></div>
+              <p class="text-sm font-extrabold text-slate-600 uppercase tracking-widest">School Information</p>
+            </div>
+
+            <!-- School Name + School Address (readonly) -->
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1.5">School Name</label>
+                <input id="reg-school" type="text" value="Aurora State College of Technology (ASCOT)" readonly
+                  class="form-input w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-100 dark:bg-slate-700 text-sm text-slate-500 cursor-default"/>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1.5">School Address</label>
+                <input id="reg-schooladdr" type="text" value="Zabali, Baler, Aurora" readonly
+                  class="form-input w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-100 dark:bg-slate-700 text-sm text-slate-500 cursor-default"/>
+              </div>
+            </div>
+
+            <!-- Course + Year Level -->
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1.5">Course <span class="text-red-400">*</span></label>
+                <select id="reg-course" class="form-input w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-100 appearance-none transition-colors">
+                  <option value="">&#8212; Select Course &#8212;</option>
+                  <option>College of Law</option>
+                  <option>School of Accountancy and Business Management</option>
+                  <option>School of Agricultural Sciences</option>
+                  <option>School of Arts and Sciences</option>
+                  <option>School of Education</option>
+                  <option>School of Engineering</option>
+                  <option>School of Fisheries and Ocean Sciences</option>
+                  <option>School of Forestry and Environmental Sciences</option>
+                  <option>School of Industrial Technology</option>
+                  <option>School of Information Technology</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1.5">Year Level <span class="text-red-400">*</span></label>
+                <select id="reg-yearlevel" class="form-input w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-100 appearance-none transition-colors">
+                  <option value="">&#8212; Select &#8212;</option>
+                  <option>1st Year</option><option>2nd Year</option><option>3rd Year</option><option>4th Year</option><option>5th Year</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- ─────────────────────────────────────── -->
+          <!-- FAMILY INFORMATION                      -->
+          <!-- ─────────────────────────────────────── -->
+          <div class="mb-6">
+            <div class="flex items-center gap-2 mb-4 pb-2 border-b-2 border-orange-100">
+              <div class="w-7 h-7 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
+                <i class="fa-solid fa-people-group text-orange-500 text-sm"></i></div>
+              <p class="text-sm font-extrabold text-slate-600 uppercase tracking-widest">Family Information</p>
+            </div>
+
+            <!-- Father -->
+            <div class="bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 rounded-2xl p-4 mb-4">
+              <p class="text-xs font-extrabold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                <i class="fa-solid fa-person text-blue-400"></i> Father's Information</p>
+              <div class="grid grid-cols-4 gap-2 mb-2">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">First Name</label>
+                  <input id="father-fname" type="text" placeholder="Juan" oninput="blockInvalidNameChars(this)"
+                    class="form-input w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-700 placeholder:text-slate-300"/>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Middle Name <span class="text-slate-300 font-normal">(opt.)</span></label>
+                  <input id="father-mname" type="text" placeholder="Santos" oninput="blockInvalidNameChars(this)"
+                    class="form-input w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-700 placeholder:text-slate-300"/>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Last Name</label>
+                  <input id="father-lname" type="text" placeholder="Dela Cruz" oninput="blockInvalidNameChars(this)"
+                    class="form-input w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-700 placeholder:text-slate-300"/>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Suffix <span class="text-slate-300 font-normal">(opt.)</span></label>
+                  <select id="father-suffix" class="form-input w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-700 appearance-none">
+                    <option value="">&#8212; None &#8212;</option><option>Jr.</option><option>Sr.</option><option>II</option><option>III</option><option>IV</option></select>
+                </div>
+              </div>
+              <!-- Father contact + employer -->
+              <div class="grid grid-cols-2 gap-2 mb-2">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Contact Number <span class="text-slate-400 font-normal">(opt.)</span></label>
+                  <div class="flex rounded-xl overflow-hidden border border-slate-200 bg-white focus-within:border-blue-400 transition-all">
+                    <span class="flex items-center px-2.5 bg-slate-100 border-r border-slate-200 text-xs font-semibold text-slate-600 select-none whitespace-nowrap">&#127477;&#127469; +63</span>
+                    <input id="father-phone" type="tel" placeholder="9171234567" maxlength="10" oninput="countParentPhone('father-phone','father-phone-count')"
+                      class="flex-1 px-2.5 py-2 bg-transparent text-sm text-slate-700 placeholder:text-slate-300 outline-none"/>
+                  </div>
+                  <div class="flex justify-between mt-1"><p class="text-xs text-slate-400">10 digits after +63</p><span id="father-phone-count" class="text-xs text-slate-400">0/10</span></div>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Employer / Company <span class="text-slate-400 font-normal">(opt.)</span></label>
+                  <input id="father-employer" type="text" placeholder="e.g. PGA, ASCOT, Private"
+                    class="form-input w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-700 placeholder:text-slate-300"/>
+                </div>
+              </div>
+              <!-- Father address -->
+              <div>
+                <div class="flex items-center justify-between mb-1.5">
+                  <label class="block text-xs font-semibold text-slate-600">Address <span class="text-slate-400 font-normal">(opt.)</span></label>
+                  <label class="flex items-center gap-1.5 cursor-pointer text-xs text-slate-500 font-semibold select-none">
+                    <input type="checkbox" id="father-same-as-perm" onchange="toggleParentSameAsPerm('father')" class="w-3.5 h-3.5 accent-blue-600"/>
+                    Same as Permanent
+                  </label>
+                </div>
+                <div class="space-y-1.5" id="father-addr-fields">
+                  <div class="relative"><select id="father-region" onchange="loadAddrCascade('father','province')"
+                    class="form-input w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-700 appearance-none pr-8 transition-colors">
+                    <option value="">&#8212; Region &#8212;</option></select>
+                    <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs pointer-events-none"></i></div>
+                  <div class="relative"><select id="father-province" onchange="loadAddrCascade('father','city')" disabled
+                    class="form-input w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-600 appearance-none pr-8 disabled:opacity-50 transition-colors">
+                    <option value="">&#8212; Province &#8212;</option></select>
+                    <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs pointer-events-none"></i></div>
+                  <div class="relative"><select id="father-city" onchange="loadAddrCascade('father','brgy')" disabled
+                    class="form-input w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-600 appearance-none pr-8 disabled:opacity-50 transition-colors">
+                    <option value="">&#8212; City/Municipality &#8212;</option></select>
+                    <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs pointer-events-none"></i></div>
+                  <div class="relative"><select id="father-brgy" onchange="buildAddrString('father')" disabled
+                    class="form-input w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-600 appearance-none pr-8 disabled:opacity-50 transition-colors">
+                    <option value="">&#8212; Barangay &#8212;</option></select>
+                    <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs pointer-events-none"></i></div>
+                  <input id="father-addr-hidden" type="hidden" value=""/>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mother -->
+            <div class="bg-pink-50/50 dark:bg-pink-950/20 border border-pink-100 dark:border-pink-900/30 rounded-2xl p-4 mb-4">
+              <p class="text-xs font-extrabold text-pink-600 dark:text-pink-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                <i class="fa-solid fa-person-dress text-pink-400"></i> Mother's Information</p>
+              <div class="grid grid-cols-4 gap-2 mb-2">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">First Name</label>
+                  <input id="mother-fname" type="text" placeholder="Maria" oninput="blockInvalidNameChars(this)"
+                    class="form-input w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-700 placeholder:text-slate-300"/>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Middle Name <span class="text-slate-300 font-normal">(opt.)</span></label>
+                  <input id="mother-mname" type="text" placeholder="Santos" oninput="blockInvalidNameChars(this)"
+                    class="form-input w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-700 placeholder:text-slate-300"/>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Last Name</label>
+                  <input id="mother-lname" type="text" placeholder="Dela Cruz" oninput="blockInvalidNameChars(this)"
+                    class="form-input w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-700 placeholder:text-slate-300"/>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Suffix <span class="text-slate-300 font-normal">(opt.)</span></label>
+                  <select id="mother-suffix" class="form-input w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-700 appearance-none">
+                    <option value="">&#8212; None &#8212;</option><option>Jr.</option><option>Sr.</option><option>II</option><option>III</option><option>IV</option></select>
+                </div>
+              </div>
+              <!-- Mother contact + employer -->
+              <div class="grid grid-cols-2 gap-2 mb-2">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Contact Number <span class="text-slate-400 font-normal">(opt.)</span></label>
+                  <div class="flex rounded-xl overflow-hidden border border-slate-200 bg-white focus-within:border-blue-400 transition-all">
+                    <span class="flex items-center px-2.5 bg-slate-100 border-r border-slate-200 text-xs font-semibold text-slate-600 select-none whitespace-nowrap">&#127477;&#127469; +63</span>
+                    <input id="mother-phone" type="tel" placeholder="9171234567" maxlength="10" oninput="countParentPhone('mother-phone','mother-phone-count')"
+                      class="flex-1 px-2.5 py-2 bg-transparent text-sm text-slate-700 placeholder:text-slate-300 outline-none"/>
+                  </div>
+                  <div class="flex justify-between mt-1"><p class="text-xs text-slate-400">10 digits after +63</p><span id="mother-phone-count" class="text-xs text-slate-400">0/10</span></div>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Employer / Company <span class="text-slate-400 font-normal">(opt.)</span></label>
+                  <input id="mother-employer" type="text" placeholder="e.g. PGA, ASCOT, Private"
+                    class="form-input w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-700 placeholder:text-slate-300"/>
+                </div>
+              </div>
+              <!-- Mother address -->
+              <div>
+                <div class="flex items-center justify-between mb-1.5">
+                  <label class="block text-xs font-semibold text-slate-600">Address <span class="text-slate-400 font-normal">(opt.)</span></label>
+                  <label class="flex items-center gap-1.5 cursor-pointer text-xs text-slate-500 font-semibold select-none">
+                    <input type="checkbox" id="mother-same-as-perm" onchange="toggleParentSameAsPerm('mother')" class="w-3.5 h-3.5 accent-blue-600"/>
+                    Same as Permanent
+                  </label>
+                </div>
+                <div class="space-y-1.5" id="mother-addr-fields">
+                  <div class="relative"><select id="mother-region" onchange="loadAddrCascade('mother','province')"
+                    class="form-input w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-700 appearance-none pr-8 transition-colors">
+                    <option value="">&#8212; Region &#8212;</option></select>
+                    <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs pointer-events-none"></i></div>
+                  <div class="relative"><select id="mother-province" onchange="loadAddrCascade('mother','city')" disabled
+                    class="form-input w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-600 appearance-none pr-8 disabled:opacity-50 transition-colors">
+                    <option value="">&#8212; Province &#8212;</option></select>
+                    <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs pointer-events-none"></i></div>
+                  <div class="relative"><select id="mother-city" onchange="loadAddrCascade('mother','brgy')" disabled
+                    class="form-input w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-600 appearance-none pr-8 disabled:opacity-50 transition-colors">
+                    <option value="">&#8212; City/Municipality &#8212;</option></select>
+                    <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs pointer-events-none"></i></div>
+                  <div class="relative"><select id="mother-brgy" onchange="buildAddrString('mother')" disabled
+                    class="form-input w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-600 appearance-none pr-8 disabled:opacity-50 transition-colors">
+                    <option value="">&#8212; Barangay &#8212;</option></select>
+                    <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs pointer-events-none"></i></div>
+                  <input id="mother-addr-hidden" type="hidden" value=""/>
+                </div>
+              </div>
+            </div>
+
+            <!-- Monthly Income -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1.5"><i class="fa-solid fa-peso-sign mr-1 text-green-500"></i>Combined Monthly Income <span class="text-red-400">*</span></label>
+              <select id="reg-income" class="form-input w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-100 appearance-none transition-colors">
+                <option value="">&#8212; Select Income Bracket &#8212;</option>
+                <option>Below &#8369;5,000</option>
+                <option>&#8369;5,000 &#8211; &#8369;9,999</option>
+                <option>&#8369;10,000 &#8211; &#8369;14,999</option>
+                <option>&#8369;15,000 &#8211; &#8369;19,999</option>
+                <option>&#8369;20,000 &#8211; &#8369;29,999</option>
+                <option>&#8369;30,000 &#8211; &#8369;49,999</option>
+                <option>&#8369;50,000 and above</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="err-3" class="hidden mb-4 p-3 bg-red-50 border border-red-100 rounded-xl text-red-500 text-sm flex items-start gap-2" role="alert">
+            <i class="fa-solid fa-circle-exclamation mt-0.5 flex-shrink-0"></i><span id="err-3-txt"></span></div>
+          <div class="flex gap-3">
+            <button id="btn-step3-back" onclick="back(3)" class="flex-1 border border-slate-200 text-slate-500 font-bold py-3 rounded-xl text-sm hover:bg-slate-50 transition-all"><i class="fa-solid fa-arrow-left mr-1"></i> Back</button>
+            <button id="btn-step3" onclick="go(3)" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl text-sm transition-all">Continue <i class="fa-solid fa-arrow-right ml-1"></i></button>
+          </div>
+        </div>
+
+                <!-- ── STEP 4: Profile Photo ── -->
+        <div id="step-4" class="hidden px-8 pb-8 anim-slide-in">
+          <h2 class="text-xl font-extrabold text-slate-800 dark:text-white mb-1">Profile Photo</h2>
+          <p class="text-slate-400 text-sm mb-6">Upload a clear face photo. Drag the white square to reposition and pull corners to resize your crop area. <span class="text-red-400 font-semibold">*</span> Required.</p>
+
+          <!-- Avatar display — interactive crop viewfinder -->
+          <div class="flex flex-col items-center mb-6">
+
+            <!-- PLACEHOLDER (no image yet) -->
+            <div id="av-placeholder-wrap" class="relative w-48 h-48 rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800 border-4 border-slate-200 dark:border-slate-700 shadow-lg mb-3 cursor-pointer flex flex-col items-center justify-center gap-2 text-slate-300"
+                 onclick="document.getElementById('av-file').click()">
+              <i class="fa-solid fa-user-circle text-6xl"></i>
+              <span class="text-xs font-semibold">Click to upload</span>
+            </div>
+
+            <!-- VIEWFINDER (shown after image selected) -->
+            <div id="av-viewfinder-wrap" class="hidden flex-col items-center mb-1">
+              <!-- Full image container with draggable/resizable square overlay -->
+              <div class="relative rounded-xl overflow-hidden shadow-xl mb-3 bg-slate-900 select-none"
+                   id="av-vf-container"
+                   style="width:360px; max-width:100%;">
+                <img id="av-prev-full" src="" alt="Full photo" class="w-full object-contain block" style="max-height:300px; min-height:200px;"/>
+                <!-- Dim canvas for outside-crop darkening -->
+                <canvas id="av-dim-canvas" class="absolute inset-0 pointer-events-none" style="width:100%;height:100%;opacity:0.6;top:0;left:0;"></canvas>
+                <!-- Draggable/resizable crop square -->
+                <div id="av-vf-frame" class="absolute hidden"
+                     style="border:2.5px solid rgba(255,255,255,0.92); box-shadow:0 0 0 1px rgba(0,0,0,0.4); cursor:move; user-select:none;">
+                  <!-- Corner handles -->
+                  <div class="av-handle" data-handle="nw" style="position:absolute;width:16px;height:16px;background:#fff;border-radius:3px;top:-8px;left:-8px;cursor:nw-resize;z-index:2;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>
+                  <div class="av-handle" data-handle="ne" style="position:absolute;width:16px;height:16px;background:#fff;border-radius:3px;top:-8px;right:-8px;cursor:ne-resize;z-index:2;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>
+                  <div class="av-handle" data-handle="sw" style="position:absolute;width:16px;height:16px;background:#fff;border-radius:3px;bottom:-8px;left:-8px;cursor:sw-resize;z-index:2;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>
+                  <div class="av-handle" data-handle="se" style="position:absolute;width:16px;height:16px;background:#fff;border-radius:3px;bottom:-8px;right:-8px;cursor:se-resize;z-index:2;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>
+                  <!-- Rule-of-thirds grid lines -->
+                  <div style="position:absolute;inset:0;pointer-events:none;">
+                    <div style="position:absolute;left:33.3%;top:0;bottom:0;border-left:1px solid rgba(255,255,255,0.3);"></div>
+                    <div style="position:absolute;left:66.6%;top:0;bottom:0;border-left:1px solid rgba(255,255,255,0.3);"></div>
+                    <div style="position:absolute;top:33.3%;left:0;right:0;border-top:1px solid rgba(255,255,255,0.3);"></div>
+                    <div style="position:absolute;top:66.6%;left:0;right:0;border-top:1px solid rgba(255,255,255,0.3);"></div>
+                  </div>
+                  <span class="absolute whitespace-nowrap text-[10px] font-bold text-white/80 tracking-wide drop-shadow pointer-events-none" style="bottom:-22px;left:50%;transform:translateX(-50%);">drag · resize corners</span>
+                </div>
+              </div>
+              <!-- Preview row -->
+              <div class="flex items-center gap-4 mt-2">
+                <div class="flex flex-col items-center gap-1">
+                  <span class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Crop Preview</span>
+                  <div class="w-20 h-20 rounded-2xl overflow-hidden border-2 border-blue-500 shadow-lg">
+                    <canvas id="av-crop-preview" width="80" height="80" class="w-full h-full"></canvas>
+                  </div>
+                </div>
+                <div class="text-xs text-slate-400 max-w-[180px] leading-snug">
+                  <i class="fa-solid fa-circle-info text-blue-400 mr-1"></i>
+                  This is your profile photo preview. Drag the box or pull corners to adjust.<br/>
+                  <button type="button" onclick="document.getElementById('av-file').click()" class="mt-2 text-blue-500 font-semibold hover:underline text-[11px]">Change photo</button>
+                </div>
+              </div>
+            </div>
+
+            <input id="av-file" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="previewAvatarViewfinder(event)"/>
+            <p class="text-xs text-slate-400 mb-1 mt-3">JPG, PNG, WEBP · max 10MB</p>
+            <button type="button" onclick="document.getElementById('av-file').click()"
+              class="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors">
+              <i class="fa-solid fa-camera"></i> Choose Photo</button>
+          </div>
+
+          <!-- Hidden inputs -->
+          <canvas id="crop-canvas" class="hidden"></canvas>
+          <input id="av-cropped-data" type="hidden" value=""/>
+          <input id="avatar-face-x"    type="hidden" value="50"/>
+          <input id="avatar-face-y"    type="hidden" value="50"/>
+          <input id="avatar-crop-x"    type="hidden" value="25"/>
+          <input id="avatar-crop-y"    type="hidden" value="25"/>
+          <input id="avatar-crop-size" type="hidden" value="50"/>
+
+          <div id="err-4" class="hidden mb-4 p-3 bg-red-50 border border-red-100 rounded-xl text-red-500 text-sm flex items-start gap-2" role="alert">
+            <i class="fa-solid fa-circle-exclamation mt-0.5 flex-shrink-0"></i><span id="err-4-txt"></span></div>
+          <div class="flex gap-3">
+            <button onclick="back(4)" class="flex-1 border border-slate-200 text-slate-500 font-bold py-3 rounded-xl text-sm hover:bg-slate-50 transition-all"><i class="fa-solid fa-arrow-left mr-1"></i> Back</button>
+            <button id="btn-step4" onclick="go(4)" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl text-sm transition-all">Continue <i class="fa-solid fa-arrow-right ml-1"></i></button>
+          </div>
+        </div>
+
+
+        <!-- ── STEP 5: Document Requirements ── -->
+        <div id="step-5" class="hidden px-8 pb-8 anim-slide-in">
+          <h2 class="text-xl font-extrabold text-slate-800 dark:text-white mb-1">Document Requirements</h2>
+          <p class="text-slate-400 text-sm mb-3">Upload all required documents to complete your application.</p>
+
+          <div class="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl mb-5 text-xs text-blue-700 dark:text-blue-300">
+            <i class="fa-solid fa-shield-halved mt-0.5 flex-shrink-0"></i>
+            <span>Your documents are <strong>encrypted</strong> and used only for verification purposes by PGA-DAMIS.</span>
+          </div>
+
+          <!-- School ID -->
+          <div class="mb-4">
+            <label class="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1.5"><i class="fa-solid fa-id-card text-blue-500 mr-1"></i>School ID <span class="text-red-400">*</span></label>
+            <div id="doc-zone-school-id" class="drop-zone border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors overflow-hidden"
+              onclick="if(!document.getElementById('doc-prev-school-id').classList.contains('hidden'))return; document.getElementById('doc-file-school-id').click()"
+              ondragover="event.preventDefault(); this.classList.add('drag-over')"
+              ondragleave="this.classList.remove('drag-over')" ondrop="handleDocDrop(event,'school-id')">
+              <div id="doc-def-school-id" class="p-4 text-center"><i class="fa-solid fa-cloud-arrow-up text-2xl text-slate-300 mb-1"></i>
+                <p class="text-sm font-semibold text-slate-500">Drag &amp; drop or click to upload</p>
+                <p class="text-xs text-slate-400">JPG, PNG, WEBP, PDF, DOCX · max 10MB</p></div>
+              <div id="doc-prev-school-id" class="hidden">
+                <div id="doc-thumb-school-id" class="w-full bg-slate-100"></div>
+                <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800">
+                  <span id="doc-fn-school-id" class="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate flex-1"></span>
+                  <span class="text-xs text-green-500 font-semibold">&#10003; Ready</span>
+                  <button type="button" onclick="clearDocFile(event,'school-id')" class="w-6 h-6 rounded-full bg-red-50 text-red-400 hover:bg-red-100 flex items-center justify-center text-xs flex-shrink-0"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+              </div>
+            </div>
+            <input id="doc-file-school-id" type="file" accept="image/jpeg,image/png,image/webp,application/pdf,.docx" class="hidden" onchange="handleDocFile(event,'school-id')"/>
+          </div>
+
+          <!-- Certificate of Residency -->
+          <div class="mb-4">
+            <label class="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1.5"><i class="fa-solid fa-house text-green-500 mr-1"></i>Certificate of Residency <span class="text-red-400">*</span></label>
+            <div id="doc-zone-residency" class="drop-zone border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-green-400 hover:bg-green-50 transition-colors overflow-hidden"
+              onclick="if(!document.getElementById('doc-prev-residency').classList.contains('hidden'))return; document.getElementById('doc-file-residency').click()"
+              ondragover="event.preventDefault(); this.classList.add('drag-over')"
+              ondragleave="this.classList.remove('drag-over')" ondrop="handleDocDrop(event,'residency')">
+              <div id="doc-def-residency" class="p-4 text-center"><i class="fa-solid fa-cloud-arrow-up text-2xl text-slate-300 mb-1"></i>
+                <p class="text-sm font-semibold text-slate-500">Drag &amp; drop or click to upload</p>
+                <p class="text-xs text-slate-400">JPG, PNG, WEBP, PDF, DOCX · max 10MB</p></div>
+              <div id="doc-prev-residency" class="hidden">
+                <div id="doc-thumb-residency" class="w-full bg-slate-100"></div>
+                <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800">
+                  <span id="doc-fn-residency" class="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate flex-1"></span>
+                  <span class="text-xs text-green-500 font-semibold">&#10003; Ready</span>
+                  <button type="button" onclick="clearDocFile(event,'residency')" class="w-6 h-6 rounded-full bg-red-50 text-red-400 hover:bg-red-100 flex items-center justify-center text-xs flex-shrink-0"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+              </div>
+            </div>
+            <input id="doc-file-residency" type="file" accept="image/jpeg,image/png,image/webp,application/pdf,.docx" class="hidden" onchange="handleDocFile(event,'residency')"/>
+          </div>
+
+          <!-- Certificate of Low Income -->
+          <div class="mb-4">
+            <label class="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1.5"><i class="fa-solid fa-hand-holding-heart text-amber-500 mr-1"></i>Certificate of Low Income <span class="text-red-400">*</span></label>
+            <div id="doc-zone-low-income" class="drop-zone border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-amber-400 hover:bg-amber-50 transition-colors overflow-hidden"
+              onclick="if(!document.getElementById('doc-prev-low-income').classList.contains('hidden'))return; document.getElementById('doc-file-low-income').click()"
+              ondragover="event.preventDefault(); this.classList.add('drag-over')"
+              ondragleave="this.classList.remove('drag-over')" ondrop="handleDocDrop(event,'low-income')">
+              <div id="doc-def-low-income" class="p-4 text-center"><i class="fa-solid fa-cloud-arrow-up text-2xl text-slate-300 mb-1"></i>
+                <p class="text-sm font-semibold text-slate-500">Drag &amp; drop or click to upload</p>
+                <p class="text-xs text-slate-400">JPG, PNG, WEBP, PDF, DOCX · max 10MB</p></div>
+              <div id="doc-prev-low-income" class="hidden">
+                <div id="doc-thumb-low-income" class="w-full bg-slate-100"></div>
+                <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800">
+                  <span id="doc-fn-low-income" class="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate flex-1"></span>
+                  <span class="text-xs text-green-500 font-semibold">&#10003; Ready</span>
+                  <button type="button" onclick="clearDocFile(event,'low-income')" class="w-6 h-6 rounded-full bg-red-50 text-red-400 hover:bg-red-100 flex items-center justify-center text-xs flex-shrink-0"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+              </div>
+            </div>
+            <input id="doc-file-low-income" type="file" accept="image/jpeg,image/png,image/webp,application/pdf,.docx" class="hidden" onchange="handleDocFile(event,'low-income')"/>
+          </div>
+
+          <!-- Certificate of Enrollment -->
+          <div class="mb-4">
+            <label class="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1.5"><i class="fa-solid fa-graduation-cap text-indigo-500 mr-1"></i>Certificate of Enrollment <span class="text-red-400">*</span></label>
+            <div id="doc-zone-enrollment" class="drop-zone border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors overflow-hidden"
+              onclick="if(!document.getElementById('doc-prev-enrollment').classList.contains('hidden'))return; document.getElementById('doc-file-enrollment').click()"
+              ondragover="event.preventDefault(); this.classList.add('drag-over')"
+              ondragleave="this.classList.remove('drag-over')" ondrop="handleDocDrop(event,'enrollment')">
+              <div id="doc-def-enrollment" class="p-4 text-center"><i class="fa-solid fa-cloud-arrow-up text-2xl text-slate-300 mb-1"></i>
+                <p class="text-sm font-semibold text-slate-500">Drag &amp; drop or click to upload</p>
+                <p class="text-xs text-slate-400">JPG, PNG, WEBP, PDF, DOCX · max 10MB</p></div>
+              <div id="doc-prev-enrollment" class="hidden">
+                <div id="doc-thumb-enrollment" class="w-full bg-slate-100"></div>
+                <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800">
+                  <span id="doc-fn-enrollment" class="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate flex-1"></span>
+                  <span class="text-xs text-green-500 font-semibold">&#10003; Ready</span>
+                  <button type="button" onclick="clearDocFile(event,'enrollment')" class="w-6 h-6 rounded-full bg-red-50 text-red-400 hover:bg-red-100 flex items-center justify-center text-xs flex-shrink-0"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+              </div>
+            </div>
+            <input id="doc-file-enrollment" type="file" accept="image/jpeg,image/png,image/webp,application/pdf,.docx" class="hidden" onchange="handleDocFile(event,'enrollment')"/>
+          </div>
+
+          <div class="bg-slate-50 dark:bg-slate-800/60 rounded-xl p-4 mb-5 space-y-3 border border-slate-100 dark:border-slate-700">
+            <label class="flex items-start gap-3 cursor-pointer">
+              <input id="chk-terms" type="checkbox" class="mt-0.5 w-4 h-4 accent-blue-600 flex-shrink-0"/>
+              <span class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">I have read and agree to the <button type="button" onclick="openTerms()" class="text-blue-600 font-bold hover:underline">Terms &amp; Conditions</button> and <button type="button" class="text-blue-600 font-bold hover:underline">Privacy Policy</button> of PGA-DAMIS.</span>
+            </label>
+            <label class="flex items-start gap-3 cursor-pointer">
+              <input id="chk-news" type="checkbox" class="mt-0.5 w-4 h-4 accent-blue-600 flex-shrink-0"/>
+              <span class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">Send me dormitory updates via email. <span class="text-slate-400">(optional)</span></span>
+            </label>
+          </div>
+
+          <div id="err-5" class="hidden mb-4 p-3 bg-red-50 border border-red-100 rounded-xl text-red-500 text-sm flex items-start gap-2" role="alert">
+            <i class="fa-solid fa-circle-exclamation mt-0.5 flex-shrink-0"></i><span id="err-5-txt"></span></div>
+          <div class="flex gap-3">
+            <button onclick="back(5)" class="flex-1 border border-slate-200 text-slate-500 font-bold py-3 rounded-xl text-sm hover:bg-slate-50 transition-all"><i class="fa-solid fa-arrow-left mr-1"></i> Back</button>
+            <button id="btn-complete" onclick="completeRegistration()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl text-sm transition-all">
+              Submit Application <i class="fa-solid fa-paper-plane ml-1"></i></button>
+          </div>
+        </div>
+
+
+                <!-- SUCCESS -->
+        <div id="step-ok" class="hidden px-8 pb-10 anim-fade-up text-center">
+          <div class="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4 mt-4">
+            <i class="fa-solid fa-clock text-4xl text-amber-500"></i>
+          </div>
+          <h2 class="text-2xl font-extrabold text-slate-800 dark:text-white mb-2">Application Submitted! ⏳</h2>
+          <p class="text-slate-500 text-sm mb-1">Your registration is <strong class="text-slate-700">under review</strong> by our team.</p>
+          <p class="text-slate-400 text-sm mb-2">We'll email you at <strong id="reg-confirm-email" class="text-slate-600"></strong> within <strong class="text-slate-600">24 hours</strong> once your account is approved.</p>
+          <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6 text-left">
+            <p class="text-xs text-amber-700 font-semibold mb-1">What happens next?</p>
+            <ul class="text-xs text-amber-600 space-y-1">
+              <li>✅ Our admin will review your information and ID</li>
+              <li>✅ You'll receive an approval email when ready</li>
+              <li>✅ Then you can log in and join the community!</li>
+            </ul>
+          </div>
+          <p class="text-xs text-slate-400 mb-4">You will <strong>not</strong> be able to log in until your account is approved.</p>
+          <button onclick="location.reload()" class="w-full bg-slate-700 hover:bg-slate-800 text-white font-bold py-3.5 rounded-xl text-sm shadow transition-all">
+            Back to Home <i class="fa-solid fa-house ml-1.5"></i></button>
+        </div>
+
+      </div><!-- /panel-signup -->
+    </div>
+  </div>
+</div>
+
+
+<!-- ── Image Crop Modal ── -->
+<div id="crop-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70" style="backdrop-filter:blur(4px);">
+  <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700">
+      <div>
+        <h3 class="font-extrabold text-slate-800 dark:text-white text-lg">Crop Photo</h3>
+        <p class="text-xs text-slate-400 mt-0.5">Drag to reposition. Pinch or scroll to zoom.</p>
+      </div>
+      <button onclick="closeCropModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500">
+        <i class="fa-solid fa-xmark text-sm"></i></button>
+    </div>
+    <div class="relative bg-slate-900 overflow-hidden" style="height:320px;">
+      <canvas id="crop-preview-canvas" class="absolute inset-0 w-full h-full" style="cursor:move;"></canvas>
+      <!-- Crop overlay - square guide -->
+      <div id="crop-square-guide" class="absolute pointer-events-none border-2 border-white/70"
+           style="box-shadow:0 0 0 9999px rgba(0,0,0,0.5); left:50%; top:50%; transform:translate(-50%,-50%); width:240px; height:240px;"></div>
+    </div>
+    <div class="px-5 py-3 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2 flex-1">
+        <i class="fa-solid fa-magnifying-glass-minus text-slate-400 text-sm"></i>
+        <input id="crop-zoom" type="range" min="0.5" max="3" step="0.05" value="1" oninput="updateCropZoom(this.value)"
+          class="flex-1 accent-blue-600"/>
+        <i class="fa-solid fa-magnifying-glass-plus text-slate-400 text-sm"></i>
+      </div>
+    </div>
+    <div class="px-5 py-4 flex gap-3">
+      <button onclick="closeCropModal()" class="flex-1 border border-slate-200 text-slate-500 font-bold py-2.5 rounded-xl text-sm hover:bg-slate-50">Cancel</button>
+      <button onclick="applyCrop()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm">
+        <i class="fa-solid fa-crop-simple mr-1"></i> Apply Crop</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/psgc-data.js"></script>
+<script src="/js/auth.js"></script>
+<script>
+  function toggleDark() {
+    const isDark = document.documentElement.classList.toggle('dark');
+    localStorage.theme = isDark ? 'dark' : 'light';
+    const icon = document.getElementById('dark-icon');
+    if (icon) icon.className = isDark ? 'fa-solid fa-sun text-sm text-yellow-400' : 'fa-solid fa-moon text-sm';
+    const btn = document.getElementById('dark-btn');
+    if (btn) btn.title = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+    // Light mode: restore page backgrounds
+    document.body.style.backgroundColor = isDark ? '' : '';
+  }
+  (function() {
+    const icon = document.getElementById('dark-icon');
+    if (icon) {
+      const isDark = document.documentElement.classList.contains('dark');
+      icon.className = isDark ? 'fa-solid fa-sun text-sm text-yellow-400' : 'fa-solid fa-moon text-sm';
+    }
+  })();
+</script>
+
+    <!-- ── Fullscreen Image Lightbox ── -->
+    <div id="lightbox" class="hidden fixed inset-0 z-50 bg-black/90 flex flex-col" onclick="closeLightbox(event)">
+      <div class="flex items-center justify-between px-4 py-3 flex-shrink-0">
+        <div class="min-w-0">
+          <p id="lb-name" class="text-white font-semibold text-sm truncate"></p>
+          <p id="lb-size" class="text-white/50 text-xs tabular-nums"></p>
+        </div>
+        <button onclick="closeLightboxBtn()" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center flex-shrink-0 ml-3 transition-colors">
+          <i class="fa-solid fa-xmark text-white text-base"></i>
+        </button>
+      </div>
+      <div class="flex-1 flex items-center justify-center p-4 overflow-hidden min-h-0">
+        <img id="lb-img" src="" alt="" class="max-w-full max-h-full object-contain rounded-lg select-none" style="box-shadow:0 8px 40px rgba(0,0,0,.6);"/>
+      </div>
+      <div class="flex justify-center pb-4 flex-shrink-0">
+        <p class="text-white/30 text-xs">Tap anywhere outside to close</p>
+      </div>
+    </div>
+
+    <!-- ── Forgot Password Panels ── -->
+    <div id="panel-forgot" class="hidden fixed inset-0 z-40 bg-black/50 flex items-center justify-center p-4" style="backdrop-filter:blur(4px);">
+      <div class="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
+
+        <!-- Sub-step: enter email -->
+        <div id="fp-email-step" class="p-8">
+          <div class="flex items-center justify-between mb-5">
+            <div>
+              <h3 class="text-lg font-extrabold text-slate-800">Forgot Password?</h3>
+              <p class="text-slate-400 text-xs mt-0.5">Enter your email to receive a reset code.</p>
+            </div>
+            <button onclick="hideForgot()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-400 transition-colors flex-shrink-0">
+              <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
+          </div>
+          <div class="mb-4">
+            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Email Address</label>
+            <div class="relative">
+              <i class="fa-solid fa-envelope absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 text-sm"></i>
+              <input id="fp-email" type="email" placeholder="you@email.com" autocomplete="email"
+                onkeydown="if(event.key==='Enter')sendResetOTP()"
+                class="form-input pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-500 w-full transition-colors"/>
+            </div>
+          </div>
+          <div id="fp-email-err" class="hidden mb-3 p-2.5 bg-red-50 border border-red-100 rounded-xl text-red-500 text-xs flex items-start gap-2">
+            <i class="fa-solid fa-circle-exclamation mt-0.5 flex-shrink-0"></i><span id="fp-email-err-txt"></span>
+          </div>
+          <button id="fp-email-btn" onclick="sendResetOTP()"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl text-sm transition-all">
+            Send Reset Code <i class="fa-solid fa-arrow-right ml-1"></i>
+          </button>
+        </div>
+
+        <!-- Sub-step: enter OTP -->
+        <div id="fp-otp-step" class="hidden p-8">
+          <div class="flex items-center justify-between mb-2">
+            <div>
+              <h3 class="text-lg font-extrabold text-slate-800">Enter Reset Code</h3>
+              <p class="text-slate-400 text-xs mt-0.5">Sent to <span id="fp-otp-email" class="text-blue-600 font-semibold"></span></p>
+            </div>
+            <button onclick="hideForgot()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-400 transition-colors flex-shrink-0">
+              <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
+          </div>
+          <div class="flex justify-center gap-2 my-5" role="group">
+            <input class="otp-box" id="ro1" type="text" maxlength="1" inputmode="numeric"
+              oninput="resetOtpMove(this,null,'ro2')" onkeydown="resetOtpBack(event,null)"
+              onpaste="resetOtpPaste(event)" aria-label="Digit 1"/>
+            <input class="otp-box" id="ro2" type="text" maxlength="1" inputmode="numeric"
+              oninput="resetOtpMove(this,'ro1','ro3')" onkeydown="resetOtpBack(event,'ro1')"
+              onpaste="resetOtpPaste(event)" aria-label="Digit 2"/>
+            <input class="otp-box" id="ro3" type="text" maxlength="1" inputmode="numeric"
+              oninput="resetOtpMove(this,'ro2','ro4')" onkeydown="resetOtpBack(event,'ro2')"
+              onpaste="resetOtpPaste(event)" aria-label="Digit 3"/>
+            <input class="otp-box" id="ro4" type="text" maxlength="1" inputmode="numeric"
+              oninput="resetOtpMove(this,'ro3','ro5')" onkeydown="resetOtpBack(event,'ro3')"
+              onpaste="resetOtpPaste(event)" aria-label="Digit 4"/>
+            <input class="otp-box" id="ro5" type="text" maxlength="1" inputmode="numeric"
+              oninput="resetOtpMove(this,'ro4','ro6')" onkeydown="resetOtpBack(event,'ro4')"
+              onpaste="resetOtpPaste(event)" aria-label="Digit 5"/>
+            <input class="otp-box" id="ro6" type="text" maxlength="1" inputmode="numeric"
+              oninput="resetOtpMove(this,'ro5',null)" onkeydown="resetOtpBack(event,'ro5')"
+              onpaste="resetOtpPaste(event)" aria-label="Digit 6"/>
+          </div>
+          <div id="fp-otp-err" class="hidden mb-3 p-2.5 bg-red-50 border border-red-100 rounded-xl text-red-500 text-xs flex items-start gap-2">
+            <i class="fa-solid fa-circle-exclamation mt-0.5 flex-shrink-0"></i><span id="fp-otp-err-txt"></span>
+          </div>
+          <button id="fp-otp-btn" onclick="verifyResetOTPCode()"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl text-sm transition-all">
+            Verify Code <i class="fa-solid fa-arrow-right ml-1"></i>
+          </button>
+          <div class="flex items-center justify-between mt-3">
+            <button onclick="fpBackToEmail()" class="text-xs text-slate-400 hover:text-slate-600">
+              <i class="fa-solid fa-arrow-left mr-1"></i> Use a different email
+            </button>
+            <span id="fp-resend-timer" class="text-xs text-slate-400">Resend in <strong id="fp-resend-cd" class="text-slate-600">60</strong>s</span>
+            <button id="fp-resend-btn" onclick="fpResendCode()" class="hidden text-xs text-blue-600 font-semibold hover:underline">Resend Code</button>
+          </div>
+        </div>
+
+        <!-- Sub-step: new password -->
+        <div id="fp-pass-step" class="hidden p-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-lg font-extrabold text-slate-800">New Password</h3>
+              <p class="text-slate-400 text-xs mt-0.5">Choose a strong new password.</p>
+            </div>
+            <button onclick="hideForgot()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-400 transition-colors flex-shrink-0">
+              <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
+          </div>
+          <div class="mb-3">
+            <label class="block text-xs font-semibold text-slate-600 mb-1.5">New Password <span class="text-red-400">*</span></label>
+            <div class="relative">
+              <i class="fa-solid fa-lock absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 text-sm"></i>
+              <input id="fp-pass1" type="password" placeholder="Create a strong password" autocomplete="new-password"
+                oninput="evalResetPass(this.value)"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();$('fp-pass2').focus();}"
+                class="form-input pl-10 pr-10 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-500 w-full transition-colors"/>
+              <button type="button" onclick="toggleVis('fp-pass1',this)" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500">
+                <i class="fa-solid fa-eye text-sm"></i>
+              </button>
+            </div>
+            <!-- Strength segments -->
+            <div class="flex gap-1 mt-2">
+              <div id="fp-seg1" class="seg flex-1"></div>
+              <div id="fp-seg2" class="seg flex-1"></div>
+              <div id="fp-seg3" class="seg flex-1"></div>
+              <div id="fp-seg4" class="seg flex-1"></div>
+            </div>
+            <p id="fp-str-lbl" class="text-xs mt-1 h-4"></p>
+            <!-- Rule checklist -->
+            <div class="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
+              <div class="req-item bad flex items-center gap-1.5 text-xs" id="fp-req-len"><i class="fa-solid fa-circle-dot text-[10px]"></i> At least 8 characters</div>
+              <div class="req-item bad flex items-center gap-1.5 text-xs" id="fp-req-upper"><i class="fa-solid fa-circle-dot text-[10px]"></i> One uppercase (A–Z)</div>
+              <div class="req-item bad flex items-center gap-1.5 text-xs" id="fp-req-lower"><i class="fa-solid fa-circle-dot text-[10px]"></i> One lowercase (a–z)</div>
+              <div class="req-item bad flex items-center gap-1.5 text-xs" id="fp-req-num"><i class="fa-solid fa-circle-dot text-[10px]"></i> One number (0–9)</div>
+              <div class="req-item bad flex items-center gap-1.5 text-xs" id="fp-req-sym"><i class="fa-solid fa-circle-dot text-[10px]"></i> One symbol (!@#$%...)</div>
+              <div class="req-item bad flex items-center gap-1.5 text-xs" id="fp-req-ns"><i class="fa-solid fa-circle-dot text-[10px]"></i> No spaces allowed</div>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Confirm New Password <span class="text-red-400">*</span></label>
+            <div class="relative">
+              <i class="fa-solid fa-lock absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 text-sm"></i>
+              <input id="fp-pass2" type="password" placeholder="Repeat password" autocomplete="new-password"
+                oninput="fpCheckMatch()"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();submitResetPassword();}"
+                class="form-input pl-10 pr-10 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-500 w-full transition-colors"/>
+              <button type="button" onclick="toggleVis('fp-pass2',this)" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500">
+                <i class="fa-solid fa-eye text-sm"></i>
+              </button>
+            </div>
+            <p id="fp-match-msg" class="text-xs mt-1 h-4"></p>
+          </div>
+          <div id="fp-pass-err" class="hidden mb-3 p-2.5 bg-red-50 border border-red-100 rounded-xl text-red-500 text-xs flex items-start gap-2">
+            <i class="fa-solid fa-circle-exclamation mt-0.5 flex-shrink-0"></i><span id="fp-pass-err-txt"></span>
+          </div>
+          <button id="fp-pass-btn" onclick="submitResetPassword()"
+            class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl text-sm transition-all">
+            Update Password <i class="fa-solid fa-check ml-1"></i>
+          </button>
+        </div>
+
+        <!-- Sub-step: success -->
+        <div id="fp-done-step" class="hidden p-8 text-center">
+          <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="fa-solid fa-circle-check text-3xl text-green-500"></i>
+          </div>
+          <h3 class="text-lg font-extrabold text-slate-800 mb-2">Password Updated!</h3>
+          <p class="text-slate-400 text-sm mb-6">You can now log in with your new password.</p>
+          <button onclick="hideForgot()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl text-sm transition-all">
+            Back to Login <i class="fa-solid fa-arrow-right ml-1"></i>
+          </button>
+        </div>
+
+      </div>
+    </div>
+<script>
+// ── Step 4: Avatar Interactive Crop Viewfinder ──────────────────────────
+let _vfNatImg = null;  // natural image element for crop canvas render
+let _cropX = 0, _cropY = 0, _cropSize = 0; // crop box in rendered-image coords
+let _vfDragging = false, _vfResizing = false, _vfResizeHandle = '';
+let _vfDragStartX = 0, _vfDragStartY = 0, _vfDragStartCX = 0, _vfDragStartCY = 0;
+let _vfResizeStartX = 0, _vfResizeStartY = 0, _vfResizeStartCX = 0, _vfResizeStartCY = 0, _vfResizeStartSz = 0;
+
+function previewAvatarViewfinder(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (file.size > 10 * 1024 * 1024) { alert('File too large. Max 10MB.'); return; }
+
+  avatarFileRef = file;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      _vfNatImg = img;
+      const fullImg = document.getElementById('av-prev-full');
+      fullImg.src = e.target.result;
+
+      document.getElementById('av-placeholder-wrap').classList.add('hidden');
+      const vfWrap = document.getElementById('av-viewfinder-wrap');
+      vfWrap.classList.remove('hidden');
+      vfWrap.classList.add('flex');
+
+      // Position frame after image renders
+      fullImg.onload = null;
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+          _initCropFrame();
+        });
+      });
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function _getRenderedImageBounds() {
+  const fullImg = document.getElementById('av-prev-full');
+  if (!fullImg || !_vfNatImg) return null;
+  const cW = fullImg.offsetWidth, cH = fullImg.offsetHeight;
+  if (!cW || !cH) return null;
+  const scale = Math.min(cW / _vfNatImg.naturalWidth, cH / _vfNatImg.naturalHeight);
+  const iW = _vfNatImg.naturalWidth * scale, iH = _vfNatImg.naturalHeight * scale;
+  return { x: (cW - iW) / 2, y: (cH - iH) / 2, w: iW, h: iH, cW, cH, scale };
+}
+
+function _initCropFrame() {
+  const b = _getRenderedImageBounds();
+  if (!b) return;
+  const sz = Math.round(Math.min(b.w, b.h) * 0.75);
+  _cropX = b.x + (b.w - sz) / 2;
+  _cropY = b.y + (b.h - sz) / 2;
+  _cropSize = sz;
+  _applyCropFrame();
+  _setupCropInteraction();
+}
+
+function _applyCropFrame() {
+  const frame = document.getElementById('av-vf-frame');
+  if (!frame) return;
+  frame.classList.remove('hidden');
+  frame.style.left = _cropX + 'px';
+  frame.style.top = _cropY + 'px';
+  frame.style.width = _cropSize + 'px';
+  frame.style.height = _cropSize + 'px';
+  _drawDimCanvas();
+  _drawCropPreview();
+}
+
+function _drawDimCanvas() {
+  const container = document.getElementById('av-vf-container');
+  const canvas = document.getElementById('av-dim-canvas');
+  if (!canvas || !container) return;
+  const W = container.offsetWidth, H = document.getElementById('av-prev-full').offsetHeight;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  // Fill top
+  ctx.fillRect(0, 0, W, _cropY);
+  // Fill bottom
+  ctx.fillRect(0, _cropY + _cropSize, W, H - _cropY - _cropSize);
+  // Fill left
+  ctx.fillRect(0, _cropY, _cropX, _cropSize);
+  // Fill right
+  ctx.fillRect(_cropX + _cropSize, _cropY, W - _cropX - _cropSize, _cropSize);
+}
+
+function _drawCropPreview() {
+  const preview = document.getElementById('av-crop-preview');
+  if (!preview || !_vfNatImg) return;
+  const b = _getRenderedImageBounds();
+  if (!b) return;
+  // Map rendered crop coords back to natural image coords
+  const natX = (_cropX - b.x) / b.scale;
+  const natY = (_cropY - b.y) / b.scale;
+  const natSz = _cropSize / b.scale;
+  const ctx = preview.getContext('2d');
+  ctx.clearRect(0, 0, 80, 80);
+  ctx.drawImage(_vfNatImg, natX, natY, natSz, natSz, 0, 0, 80, 80);
+
+  // ── Save face center as percentage of natural image ──────
+  const cx = Math.round((natX + natSz / 2) / _vfNatImg.naturalWidth  * 100);
+  const cy = Math.round((natY + natSz / 2) / _vfNatImg.naturalHeight * 100);
+  const fxEl = document.getElementById('avatar-face-x');
+  const fyEl = document.getElementById('avatar-face-y');
+  if (fxEl) fxEl.value = Math.min(100, Math.max(0, cx));
+  if (fyEl) fyEl.value = Math.min(100, Math.max(0, cy));
+
+  // ── Save exact crop box for server-side face-aware avatar crop ──
+  // cropX/Y = top-left corner as % of natural width/height
+  // cropSize = box size as % of natural width (it's square)
+  const cropXPct  = Math.round(natX  / _vfNatImg.naturalWidth  * 1000) / 10; // 1 decimal
+  const cropYPct  = Math.round(natY  / _vfNatImg.naturalHeight * 1000) / 10;
+  const cropSzPct = Math.round(natSz / _vfNatImg.naturalWidth  * 1000) / 10;
+  const cxEl = document.getElementById('avatar-crop-x');
+  const cyEl = document.getElementById('avatar-crop-y');
+  const csEl = document.getElementById('avatar-crop-size');
+  if (cxEl) cxEl.value = cropXPct;
+  if (cyEl) cyEl.value = cropYPct;
+  if (csEl) csEl.value = cropSzPct;
+}
+
+function _clampCrop(b) {
+  const minSz = 40;
+  _cropSize = Math.max(minSz, Math.min(_cropSize, b.w, b.h));
+  _cropX = Math.max(b.x, Math.min(_cropX, b.x + b.w - _cropSize));
+  _cropY = Math.max(b.y, Math.min(_cropY, b.y + b.h - _cropSize));
+}
+
+function _setupCropInteraction() {
+  const container = document.getElementById('av-vf-container');
+  const frame = document.getElementById('av-vf-frame');
+  if (!container || !frame) return;
+
+  // Remove old listeners by cloning
+  const newFrame = frame.cloneNode(true);
+  frame.parentNode.replaceChild(newFrame, frame);
+
+  const getPos = (e) => {
+    const rect = container.getBoundingClientRect();
+    const touch = e.touches ? e.touches[0] : e;
+    return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+  };
+
+  // Drag to move
+  newFrame.addEventListener('mousedown', (e) => {
+    if (e.target.classList.contains('av-handle')) return;
+    e.preventDefault();
+    _vfDragging = true;
+    _vfDragStartX = e.clientX; _vfDragStartY = e.clientY;
+    _vfDragStartCX = _cropX; _vfDragStartCY = _cropY;
+  });
+
+  // Corner resize
+  newFrame.querySelectorAll('.av-handle').forEach(h => {
+    h.addEventListener('mousedown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      _vfResizing = true; _vfResizeHandle = h.dataset.handle;
+      _vfResizeStartX = e.clientX; _vfResizeStartY = e.clientY;
+      _vfResizeStartCX = _cropX; _vfResizeStartCY = _cropY; _vfResizeStartSz = _cropSize;
+    });
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    const b = _getRenderedImageBounds();
+    if (!b) return;
+    if (_vfDragging) {
+      const dx = e.clientX - _vfDragStartX, dy = e.clientY - _vfDragStartY;
+      _cropX = _vfDragStartCX + dx;
+      _cropY = _vfDragStartCY + dy;
+      _clampCrop(b);
+      _applyCropFrame();
+    } else if (_vfResizing) {
+      const dx = e.clientX - _vfResizeStartX, dy = e.clientY - _vfResizeStartY;
+      const delta = (_vfResizeHandle === 'se' || _vfResizeHandle === 'ne') ? dx : -dx;
+      const newSz = Math.max(40, _vfResizeStartSz + delta);
+      _cropSize = newSz;
+      if (_vfResizeHandle === 'nw' || _vfResizeHandle === 'sw') _cropX = _vfResizeStartCX + (_vfResizeStartSz - newSz);
+      if (_vfResizeHandle === 'nw' || _vfResizeHandle === 'ne') _cropY = _vfResizeStartCY + (_vfResizeStartSz - newSz);
+      _clampCrop(b);
+      _applyCropFrame();
+    }
+  });
+
+  document.addEventListener('mouseup', () => { _vfDragging = false; _vfResizing = false; });
+
+  // Touch support
+  newFrame.addEventListener('touchstart', (e) => {
+    if (e.target.classList.contains('av-handle')) return;
+    e.preventDefault();
+    _vfDragging = true;
+    const t = e.touches[0];
+    _vfDragStartX = t.clientX; _vfDragStartY = t.clientY;
+    _vfDragStartCX = _cropX; _vfDragStartCY = _cropY;
+  }, { passive: false });
+
+  newFrame.querySelectorAll('.av-handle').forEach(h => {
+    h.addEventListener('touchstart', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      _vfResizing = true; _vfResizeHandle = h.dataset.handle;
+      const t = e.touches[0];
+      _vfResizeStartX = t.clientX; _vfResizeStartY = t.clientY;
+      _vfResizeStartCX = _cropX; _vfResizeStartCY = _cropY; _vfResizeStartSz = _cropSize;
+    }, { passive: false });
+  });
+
+  document.addEventListener('touchmove', (e) => {
+    const b = _getRenderedImageBounds();
+    if (!b) return;
+    const t = e.touches[0];
+    if (_vfDragging) {
+      const dx = t.clientX - _vfDragStartX, dy = t.clientY - _vfDragStartY;
+      _cropX = _vfDragStartCX + dx;
+      _cropY = _vfDragStartCY + dy;
+      _clampCrop(b);
+      _applyCropFrame();
+    } else if (_vfResizing) {
+      const dx = t.clientX - _vfResizeStartX;
+      const delta = (_vfResizeHandle === 'se' || _vfResizeHandle === 'ne') ? dx : -dx;
+      const newSz = Math.max(40, _vfResizeStartSz + delta);
+      _cropSize = newSz;
+      if (_vfResizeHandle === 'nw' || _vfResizeHandle === 'sw') _cropX = _vfResizeStartCX + (_vfResizeStartSz - newSz);
+      if (_vfResizeHandle === 'nw' || _vfResizeHandle === 'ne') _cropY = _vfResizeStartCY + (_vfResizeStartSz - newSz);
+      _clampCrop(b);
+      _applyCropFrame();
+    }
+  }, { passive: false });
+
+  document.addEventListener('touchend', () => { _vfDragging = false; _vfResizing = false; });
+}
+
+function _positionViewfinderFrame(natW, natH) { /* handled by _initCropFrame */ }
+
+// Legacy stubs
+function openCropModal(event) { previewAvatarViewfinder(event); }
+function closeCropModal() {}
+function applyCrop() {}
+function updateCropZoom() {}
+function renderCropPreview() {}
+
+
+// Drag to pan crop
+// ── Parent phone counter ─────────────────────────────────────────
+function countParentPhone(inputId, countId) {
+  const el = document.getElementById(inputId);
+  const cnt = document.getElementById(countId);
+  if (!el || !cnt) return;
+  const digits = el.value.replace(/\D/g,'').slice(0,10);
+  el.value = digits;
+  cnt.textContent = digits.length + '/10';
+}
+
+// ── Same-as-permanent toggle for present address ─────────────────
+function toggleSameAsPermanent() {
+  const chk = document.getElementById('same-as-permanent');
+  const fields = document.getElementById('pres-addr-fields');
+  if (chk.checked) {
+    fields.style.opacity = '0.5';
+    fields.style.pointerEvents = 'none';
+    // Copy permanent address value to present
+    const permVal = document.getElementById('perm-addr-hidden').value;
+    document.getElementById('pres-addr-hidden').value = permVal;
+  } else {
+    fields.style.opacity = '';
+    fields.style.pointerEvents = '';
+  }
+}
+
+// ── Same-as-permanent toggle for parent address ──────────────────
+function toggleParentSameAsPerm(prefix) {
+  const chk = document.getElementById(prefix + '-same-as-perm');
+  const fields = document.getElementById(prefix + '-addr-fields');
+  if (chk.checked) {
+    fields.style.opacity = '0.5';
+    fields.style.pointerEvents = 'none';
+    const permVal = document.getElementById('perm-addr-hidden').value;
+    document.getElementById(prefix + '-addr-hidden').value = permVal;
+  } else {
+    fields.style.opacity = '';
+    fields.style.pointerEvents = '';
+  }
+}
+
+</script>

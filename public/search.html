@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>PGA-DAMIS — Search</title>
+  <link rel="manifest" href="/manifest.json"/><meta name="theme-color" content="#0070e0"/>
+  <script>if(localStorage.getItem('ch-dark')==='true')document.documentElement.classList.add('dark');</script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/relativeTime.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <link rel="stylesheet" href="/css/app.css"/>
+  <script>tailwind.config={darkMode:'class',theme:{extend:{fontFamily:{display:['Sora','sans-serif'],sans:['DM Sans','sans-serif']},colors:{brand:{50:'#eef6ff',100:'#d9ecff',400:'#4da6ff',500:'#1a8cff',600:'#0070e0',700:'#005bb5'}}}}}</script>
+  <style>
+    mark{background:#fef08a;color:#1e293b;border-radius:3px;padding:0 2px;}
+    html.dark mark{background:#713f12;color:#fef9c3;}
+    .result-card{animation:fadeIn .18s ease;transition:background .15s;}
+    .result-card:hover{background:var(--surface-2);}
+    .tab-btn.active{border-bottom:2px solid #0070e0;color:#0070e0;font-weight:600;}
+    html.dark .tab-btn.active{border-bottom-color:#58a6ff;color:#58a6ff;}
+    #main-search:focus{outline:none;box-shadow:0 0 0 3px rgba(0,112,224,.15);}
+  </style>
+</head>
+<body class="h-full">
+
+<!-- NAVBAR -->
+<nav id="navbar" class="px-4 flex items-center justify-between gap-3">
+  <a href="/feed.html" class="flex items-center gap-2 font-display font-bold text-lg text-slate-800 dark:text-slate-100 flex-shrink-0">
+    <div class="w-8 h-8 rounded-xl bg-brand-600 flex items-center justify-center"><i class="fa-solid fa-people-group text-white text-sm"></i></div>
+    <span class="hidden sm:inline">PGA-DAMIS</span>
+  </a>
+  <div class="flex-1 max-w-lg flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl px-3 py-2 gap-2 border border-transparent focus-within:border-brand-400 transition-all">
+    <i class="fa-solid fa-magnifying-glass text-brand-500 text-sm"></i>
+    <input id="main-search" type="text" placeholder="Search people or posts..." autofocus class="bg-transparent text-sm outline-none w-full text-slate-800 dark:text-slate-200 placeholder-slate-400"/>
+    <button id="clear-btn" onclick="clearSearch()" class="hidden text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><i class="fa-solid fa-xmark text-sm"></i></button>
+  </div>
+  <div class="flex items-center gap-2">
+    <a href="/messages.html" class="relative w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 flex items-center justify-center transition-colors">
+      <i class="fa-regular fa-comment-dots text-slate-600 dark:text-slate-300 text-sm"></i><span id="msg-badge" class="notif-badge hidden">0</span>
+    </a>
+    <a href="/notifications.html" class="relative w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 flex items-center justify-center transition-colors">
+      <i class="fa-solid fa-bell text-slate-600 dark:text-slate-300 text-sm"></i><span id="notif-badge" class="notif-badge hidden">0</span>
+    </a>
+    <button onclick="toggleDark()" class="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 flex items-center justify-center transition-colors">
+      <i id="dark-icon" class="fa-solid fa-moon text-slate-500 dark:text-yellow-400 text-sm"></i>
+    </button>
+    <div class="relative" id="avatar-menu-wrap">
+      <button onclick="toggleAvatarMenu()" class="w-9 h-9 rounded-xl overflow-hidden border-2 border-slate-200 dark:border-slate-700 hover:border-brand-500 transition-colors">
+        <img id="nav-avatar" src="" alt="me" class="w-full h-full object-cover" onerror="this.src='https://ui-avatars.com/api/?name=U&background=1a8cff&color=fff'"/>
+      </button>
+      <div id="avatar-dropdown" class="hidden absolute right-0 top-12 w-56 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 py-2 z-50">
+        <div id="dropdown-name" class="px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 border-b border-slate-100 dark:border-slate-700 mb-1"></div>
+        <a href="#" onclick="goProfile()" class="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg mx-1"><i class="fa-solid fa-user w-4 text-brand-500"></i> My Profile</a>
+        <div class="border-t border-slate-100 dark:border-slate-700 mt-1 pt-1 mx-1">
+          <button onclick="logout()" class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg"><i class="fa-solid fa-right-from-bracket w-4"></i> Log out</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- LAYOUT -->
+<div class="max-w-6xl mx-auto px-4 pt-[76px] pb-24 md:pb-8 flex gap-6">
+  <aside class="sidebar hidden lg:block w-60 flex-shrink-0">
+    <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-4 space-y-1">
+      <a href="/feed.html" class="nav-link"><i class="fa-solid fa-house w-4"></i> Home</a>
+      <a href="#" onclick="goProfile()" class="nav-link"><i class="fa-solid fa-user w-4"></i> Profile</a>
+      <a href="/search.html" class="nav-link active"><i class="fa-solid fa-magnifying-glass w-4"></i> Search</a>
+      <a href="/messages.html" class="nav-link relative"><i class="fa-regular fa-comment-dots w-4"></i> Messages<span id="sidebar-msg-badge" class="ml-auto bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full hidden"></span></a>
+      <a href="/notifications.html" class="nav-link relative"><i class="fa-solid fa-bell w-4"></i> Notifications<span id="sidebar-notif-badge" class="ml-auto bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full hidden"></span></a>
+    </div>
+  </aside>
+
+  <main class="flex-1 min-w-0">
+    <!-- Tabs -->
+    <div class="flex gap-1 border-b border-slate-200 dark:border-slate-800 mb-4 bg-white dark:bg-slate-900 rounded-t-2xl px-4 pt-3">
+      <button onclick="switchTab('people')" id="tab-people" class="tab-btn active px-5 py-2.5 text-sm text-slate-600 dark:text-slate-300 transition-all">
+        <i class="fa-solid fa-users mr-1.5 text-xs"></i>People
+      </button>
+      <button onclick="switchTab('posts')" id="tab-posts" class="tab-btn px-5 py-2.5 text-sm text-slate-500 dark:text-slate-400 transition-all">
+        <i class="fa-solid fa-newspaper mr-1.5 text-xs"></i>Posts
+      </button>
+    </div>
+
+    <!-- People results -->
+    <div id="people-panel">
+      <div id="people-container" class="space-y-2">
+        <!-- Suggested / results here -->
+      </div>
+    </div>
+
+    <!-- Posts results -->
+    <div id="posts-panel" class="hidden space-y-4">
+      <div id="posts-container"></div>
+    </div>
+
+    <!-- Empty state -->
+    <div id="empty-state" class="hidden py-16 text-center">
+      <div class="text-5xl mb-3">🔍</div>
+      <p class="font-semibold text-slate-700 dark:text-slate-200" id="empty-title">No results found</p>
+      <p class="text-sm text-slate-400 mt-1" id="empty-sub">Try a different name or keyword</p>
+    </div>
+  </main>
+</div>
+
+<!-- MOBILE NAV -->
+<nav id="mobile-nav" class="fixed bottom-0 left-0 right-0 z-[90] bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-around px-2 py-2 md:hidden">
+  <a href="/feed.html" class="flex flex-col items-center gap-0.5 text-slate-400 px-3 py-1"><i class="fa-solid fa-house text-xl"></i><span class="text-xs">Home</span></a>
+  <a href="/search.html" class="flex flex-col items-center gap-0.5 text-brand-600 px-3 py-1"><i class="fa-solid fa-magnifying-glass text-xl"></i><span class="text-xs font-medium">Search</span></a>
+  <a href="/messages.html" class="relative flex flex-col items-center gap-0.5 text-slate-400 px-3 py-1"><i class="fa-regular fa-comment-dots text-xl"></i><span class="text-xs">Messages</span><span id="mob-msg-badge" class="absolute -top-1 right-1 notif-badge hidden">0</span></a>
+  <a href="/notifications.html" class="relative flex flex-col items-center gap-0.5 text-slate-400 px-3 py-1"><i class="fa-solid fa-bell text-xl"></i><span class="text-xs">Alerts</span></a>
+  <a href="#" onclick="goProfile()" class="flex flex-col items-center gap-0.5 text-slate-400 px-3 py-1"><i class="fa-solid fa-user text-xl"></i><span class="text-xs">Profile</span></a>
+</nav>
+
+<script src="/js/api.js"></script>
+<script>
+  dayjs.extend(dayjs_plugin_relativeTime);
+  let currentUser=null, activeTab='people', currentQuery='', searchTimer=null;
+  const socket=io();
+  const urlQ=new URLSearchParams(location.search).get('q')||'';
+
+  function toggleDark(){const on=localStorage.getItem('ch-dark')==='true';localStorage.setItem('ch-dark',String(!on));document.documentElement.classList.toggle('dark',!on);const i=document.getElementById('dark-icon');if(i)i.className=!on?'fa-solid fa-sun text-yellow-400 text-sm':'fa-solid fa-moon text-slate-500 text-sm';toast(!on?'Dark mode on':'Light mode on','info');}
+  (function(){const i=document.getElementById('dark-icon');if(i)i.className=localStorage.getItem('ch-dark')==='true'?'fa-solid fa-sun text-yellow-400 text-sm':'fa-solid fa-moon text-slate-500 text-sm';})();
+  function toast(msg,type='success'){Toastify({text:msg,duration:3000,gravity:'top',position:'right',stopOnFocus:false,style:{background:type==='success'?'#16a34a':type==='error'?'#e5365a':'#1a8cff',borderRadius:'12px',fontFamily:'DM Sans,sans-serif',fontSize:'14px',padding:'12px 20px',pointerEvents:'none'}}).showToast();}
+  function escHtml(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  function avatarUrl(f,l){return`https://ui-avatars.com/api/?name=${encodeURIComponent((f||'U')+' '+(l||''))}&background=1a8cff&color=fff&size=128`;}
+  function setBadge(id,count){const el=document.getElementById(id);if(!el)return;if(count>0){el.textContent=count>99?'99+':count;el.classList.remove('hidden');}else el.classList.add('hidden');}
+
+  function highlight(text, q){
+    if(!q||!text) return escHtml(text||'');
+    const safe=q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    return escHtml(text).replace(new RegExp(`(${safe})`,'gi'),'<mark>$1</mark>');
+  }
+
+  async function init(){
+    const r=await fetch('/api/auth/me');const d=await r.json();
+    if(!d.loggedIn){window.location.href='/';return;}
+    currentUser=d.user;window.__currentUser=currentUser;socket.emit('join',currentUser.id);
+    document.getElementById('nav-avatar').src=currentUser.avatar||avatarUrl(currentUser.firstName,currentUser.lastName);
+    document.getElementById('dropdown-name').textContent=`${currentUser.firstName} ${currentUser.lastName}`;
+    await loadNavCounts();
+    if(urlQ){document.getElementById('main-search').value=urlQ;document.getElementById('clear-btn').classList.remove('hidden');await doSearch(urlQ);}
+    else await loadSuggested();
+  }
+
+  async function loadNavCounts(){
+    try{const[n,m]=await Promise.all([fetch('/api/notifications/unread-count').then(r=>r.json()),fetch('/api/messages/unread-count').then(r=>r.json()).catch(()=>({count:0}))]);
+    ['notif-badge','sidebar-notif-badge'].forEach(id=>setBadge(id,n.count));['msg-badge','sidebar-msg-badge','mob-msg-badge'].forEach(id=>setBadge(id,m.count));}catch{}
+  }
+
+  async function loadSuggested(){
+    const r=await fetch('/api/users/suggested');const d=await r.json();
+    renderPeople(d.users||[],'',true);
+  }
+
+  document.getElementById('main-search').addEventListener('input',(e)=>{
+    const q=e.target.value.trim();
+    document.getElementById('clear-btn').classList.toggle('hidden',!q);
+    clearTimeout(searchTimer);
+    if(!q){loadSuggested();return;}
+    searchTimer=setTimeout(()=>doSearch(q),350);
+  });
+
+  async function doSearch(q){
+    currentQuery=q;
+    const url=new URL(window.location);url.searchParams.set('q',q);window.history.replaceState({},'',url);
+    document.title=`Search: ${q} — PGA-DAMIS`;
+    showSkeletons();
+    const [pr,er]=await Promise.all([
+      fetch(`/api/users/search?q=${encodeURIComponent(q)}`).then(r=>r.json()),
+      fetch(`/api/posts/explore?limit=20`).then(r=>r.json()),
+    ]);
+    renderPeople(pr.users||[],q,false);
+    const filtered=(er.posts||[]).filter(p=>p.content?.toLowerCase().includes(q.toLowerCase())||`${p.author?.firstName} ${p.author?.lastName}`.toLowerCase().includes(q.toLowerCase()));
+    renderPosts(filtered,q);
+  }
+
+  function showSkeletons(){
+    document.getElementById('people-container').innerHTML=Array(3).fill(`<div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-4"><div class="flex gap-3 items-center"><div class="skeleton w-12 h-12 rounded-full flex-shrink-0"></div><div class="flex-1 space-y-2"><div class="skeleton h-3 w-1/3"></div><div class="skeleton h-2 w-1/4"></div></div><div class="skeleton w-20 h-8 rounded-xl"></div></div></div>`).join('');
+  }
+
+  function renderPeople(users,q,isSuggested){
+    const c=document.getElementById('people-container');
+    if(!users.length&&!isSuggested){showEmpty(`No people found for "${escHtml(q)}"`,`Try a different spelling or name.`);c.innerHTML='';return;}
+    hideEmpty();
+    if(isSuggested&&!users.length){c.innerHTML='<div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-8 text-center"><p class="text-slate-400 text-sm">No suggestions yet. Try searching for someone.</p></div>';return;}
+    const displayUsers=users.filter(u=>!window.__currentUser||u.id!==window.__currentUser.id);
+    c.innerHTML=(isSuggested?`<p class="text-xs font-semibold text-slate-400 uppercase tracking-wider px-1 mb-2">People you may know</p>`:'')+displayUsers.map(u=>{
+      const av=escHtml(u.avatar||avatarUrl(u.first_name,u.last_name));
+      const name=q?highlight(`${u.first_name} ${u.last_name}`,q):`${escHtml(u.first_name)} ${escHtml(u.last_name)}`;
+      const uname=q?highlight(`@${u.username}`,q):`@${escHtml(u.username)}`;
+      const vc=u.id_verified?'<i class="fa-solid fa-circle-check text-brand-500 text-xs ml-1"></i>':'';
+      return `<div class="result-card bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-4 cursor-pointer" onclick="window.location='/profile.html?u=${escHtml(u.username)}'">
+        <div class="flex gap-3 items-center">
+          <img src="${av}" class="w-12 h-12 rounded-full object-cover flex-shrink-0" onerror="this.src='${avatarUrl(u.first_name,u.last_name)}'"/>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-1"><span class="font-semibold text-sm text-slate-800 dark:text-slate-100">${name}</span>${vc}</div>
+            <p class="text-xs text-slate-400 truncate">${uname}</p>
+            ${u.bio?`<p class="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-1">${escHtml(u.bio)}</p>`:''}
+          </div>
+          ${(()=>{
+            const fs=u.friendshipStatus;
+            const af=u.areFriends;
+            if(af) return '<span class="text-xs font-semibold px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700 flex-shrink-0">Friends ✓</span>';
+            if(fs&&fs.status==='pending'&&fs.iRequested) return '<button onclick="event.stopPropagation();searchCancelReq(\''+u.id+'\',this)" id="fu-'+u.id+'" class="text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 flex-shrink-0">Requested</button>';
+            if(fs&&fs.status==='pending'&&!fs.iRequested) return '<button onclick="event.stopPropagation();searchAcceptReq(\''+u.id+'\',this)" id="fu-'+u.id+'" class="text-xs font-semibold px-3 py-1.5 rounded-full bg-green-600 text-white flex-shrink-0">Accept</button>';
+            return '<button onclick="event.stopPropagation();searchAddFriend(\''+u.id+'\',this)" id="fu-'+u.id+'" class="text-xs font-semibold text-brand-600 border border-brand-300 px-3 py-1.5 rounded-full hover:bg-brand-50 transition-colors flex-shrink-0">Add Friend</button>';
+          })()}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function renderPosts(posts,q){
+    const c=document.getElementById('posts-container');
+    if(!posts.length){c.innerHTML=`<div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-8 text-center"><div class="text-3xl mb-2">📝</div><p class="text-slate-500 dark:text-slate-400 text-sm">No posts found for <strong>"${escHtml(q)}"</strong></p></div>`;return;}
+    c.innerHTML=posts.slice(0,20).map(p=>{
+      const av=escHtml(p.author?.avatar||avatarUrl(p.author?.firstName,p.author?.lastName));
+      const vc=p.author?.idVerified?'<i class="fa-solid fa-circle-check text-brand-500 text-xs ml-1"></i>':'';
+      const cnt=q?highlight(p.content,q):escHtml(p.content);
+      return `<div class="post-card p-4 result-card cursor-pointer" onclick="window.location='/feed.html#post-${p.id}'">
+        <div class="flex gap-3">
+          <img src="${av}" class="w-10 h-10 rounded-full object-cover flex-shrink-0" onerror="this.src='${avatarUrl(p.author?.firstName,p.author?.lastName)}'"/>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-1"><a href="/profile.html?u=${escHtml(p.author?.username)}" onclick="event.stopPropagation()" class="font-semibold text-sm text-slate-800 dark:text-slate-100 hover:text-brand-600">${escHtml(p.author?.firstName)} ${escHtml(p.author?.lastName)}</a>${vc}</div>
+            <p class="text-xs text-slate-400">@${escHtml(p.author?.username)} · ${dayjs(p.createdAt).fromNow()}</p>
+            <p class="text-sm text-slate-700 dark:text-slate-300 mt-2 leading-relaxed line-clamp-3">${cnt}</p>
+            ${p.imageUrl?`<img src="${escHtml(p.imageUrl)}" class="mt-2 rounded-xl max-h-48 object-cover w-full" loading="lazy" alt=""/>`:''}
+            <div class="flex gap-4 mt-2 text-xs text-slate-400"><span><i class="fa-regular fa-heart mr-1"></i>${p.likeCount}</span><span><i class="fa-regular fa-comment mr-1"></i>${p.commentCount}</span></div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function switchTab(tab){
+    activeTab=tab;
+    document.getElementById('tab-people').className=`tab-btn ${tab==='people'?'active':''} px-5 py-2.5 text-sm transition-all ${tab==='people'?'text-slate-600 dark:text-slate-300':'text-slate-400'}`;
+    document.getElementById('tab-posts').className=`tab-btn ${tab==='posts'?'active':''} px-5 py-2.5 text-sm transition-all ${tab==='posts'?'text-slate-600 dark:text-slate-300':'text-slate-400'}`;
+    document.getElementById('people-panel').classList.toggle('hidden',tab!=='people');
+    document.getElementById('posts-panel').classList.toggle('hidden',tab!=='posts');
+  }
+
+  function clearSearch(){
+    document.getElementById('main-search').value='';
+    document.getElementById('clear-btn').classList.add('hidden');
+    document.getElementById('main-search').focus();
+    const url=new URL(window.location);url.searchParams.delete('q');window.history.replaceState({},'',url);
+    document.title='PGA-DAMIS — Search';
+    hideEmpty();loadSuggested();
+  }
+
+  async function searchAddFriend(userId,btn){
+    if(btn)btn.disabled=true;
+    const r=await fetch(`/api/users/${userId}/friend`,{method:'POST'});
+    const d=await r.json();
+    if(d.error){toast(d.error,'error');if(btn)btn.disabled=false;return;}
+    if(d.status==='pending'){
+      if(btn){btn.textContent='Requested';btn.disabled=false;btn.className='text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 flex-shrink-0';btn.onclick=function(e){e.stopPropagation();searchCancelReq(userId,this);};}
+      toast('Friend request sent!');
+    } else if(d.areFriends){
+      if(btn){btn.outerHTML='<span class="text-xs font-semibold px-3 py-1.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 flex-shrink-0">Friends ✓</span>';}
+      toast('You are now friends! 🎉');
+    }
+  }
+  async function searchCancelReq(userId,btn){
+    if(btn)btn.disabled=true;
+    const r=await fetch(`/api/users/${userId}/friend`,{method:'DELETE'});
+    if(r.ok){
+      if(btn){btn.textContent='Add Friend';btn.disabled=false;btn.className='text-xs font-semibold text-brand-600 border border-brand-300 px-3 py-1.5 rounded-full hover:bg-brand-50 transition-colors flex-shrink-0';btn.onclick=function(e){e.stopPropagation();searchAddFriend(userId,this);};}
+      toast('Friend request cancelled');
+    } else { if(btn)btn.disabled=false; }
+  }
+  async function searchAcceptReq(userId,btn){
+    if(btn)btn.disabled=true;
+    const r=await fetch(`/api/users/${userId}/friend/accept`,{method:'POST'});
+    if(r.ok){
+      if(btn){btn.outerHTML='<span class="text-xs font-semibold px-3 py-1.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 flex-shrink-0">Friends ✓</span>';}
+      toast('You are now friends! 🎉');
+    } else { if(btn)btn.disabled=false; }
+  }
+
+  function showEmpty(title,sub){document.getElementById('empty-state').classList.remove('hidden');document.getElementById('empty-title').textContent=title;document.getElementById('empty-sub').textContent=sub;}
+  function hideEmpty(){document.getElementById('empty-state').classList.add('hidden');}
+
+  function toggleAvatarMenu(){document.getElementById('avatar-dropdown').classList.toggle('hidden');}
+  function goProfile(){const u=window.__currentUser;if(u)window.location.href=`/profile.html?u=${u.username}`;}
+  async function logout(){await fetch('/api/auth/logout');window.location.href='/';}
+  document.addEventListener('click',(e)=>{if(!e.target.closest('#avatar-menu-wrap'))document.getElementById('avatar-dropdown')?.classList.add('hidden');});
+  socket.on('receive-dm',()=>loadNavCounts());
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  init();
+</script>
+</body>
+</html>
