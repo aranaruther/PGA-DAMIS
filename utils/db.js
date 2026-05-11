@@ -20,7 +20,8 @@
 const Database = require('better-sqlite3');
 const path     = require('path');
 
-const db = new Database(path.join(__dirname, '..', 'connecthub.db'));
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..');
+const db = new Database(path.join(DATA_DIR, 'connecthub.db'));
 
 // ── Performance: WAL mode makes reads faster ──────────
 db.pragma('journal_mode = WAL');
