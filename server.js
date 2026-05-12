@@ -54,6 +54,14 @@ const authLimiter = rateLimit({
   message: { error: 'Too many attempts. Please wait 15 minutes and try again.' },
   standardHeaders: true, legacyHeaders: false,
 });
+// OTP sends are expensive (hit email provider API) — limit tightly to prevent
+// abuse that gets our email provider accounts flagged / blocked.
+const otpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, max: 5,
+  message: { error: 'Too many verification code requests. Please wait 15 minutes and try again.' },
+  standardHeaders: true, legacyHeaders: false,
+  skipSuccessfulRequests: false,
+});
 const checkLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, max: 60,
   message: { error: 'Too many requests. Please slow down.' },
@@ -66,8 +74,8 @@ const apiLimiter = rateLimit({
 });
 // AI support chat rate limiting is handled at the Gemini API level (20 RPD)
 
-app.use('/api/auth/send-otp',              authLimiter);
-app.use('/api/auth/resend-otp',            authLimiter);
+app.use('/api/auth/send-otp',              otpLimiter);
+app.use('/api/auth/resend-otp',            otpLimiter);
 app.use('/api/auth/verify-otp',            authLimiter);
 app.use('/api/auth/complete-registration', authLimiter);
 app.use('/api/auth/login',                 authLimiter);
@@ -361,11 +369,12 @@ httpServer.listen(PORT, async () => {
   log.info(`AI Moderation: ${aiStatus}`);
   const { getDriver } = require('./utils/emailService');
   const emailDriverLabel = {
-    mailjet: `✔ Mailjet API (${process.env.MAILJET_FROM || process.env.EMAIL_USER || '?'})`,
-    brevo:   `✔ Brevo API (${process.env.BREVO_FROM || process.env.EMAIL_USER || '?'})`,
-    resend:  `✔ Resend API (${process.env.RESEND_FROM || process.env.EMAIL_USER || '?'})`,
-    smtp:    `✔ Gmail SMTP (${process.env.EMAIL_USER || '?'})`,
-    console: '⚠ Console/dev — no real delivery (set MAILJET_API_KEY for production)',
+    mailjet:  `✔ Mailjet API (${process.env.MAILJET_FROM  || process.env.EMAIL_USER || '?'})`,
+    sendgrid: `✔ SendGrid API (${process.env.SENDGRID_FROM || process.env.EMAIL_USER || '?'})`,
+    brevo:    `✔ Brevo API (${process.env.BREVO_FROM    || process.env.EMAIL_USER || '?'})`,
+    resend:   `✔ Resend API (${process.env.RESEND_FROM   || process.env.EMAIL_USER || '?'})`,
+    smtp:     `✔ Gmail SMTP (${process.env.EMAIL_USER   || '?'})`,
+    console:  '⚠ Console/dev — no real delivery (set MAILJET_API_KEY or SENDGRID_API_KEY for production)',
   }[getDriver()] || '?';
   log.info(`Email        : ${emailDriverLabel}`);
   log.divider();

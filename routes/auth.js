@@ -14,6 +14,7 @@ const log      = require('../utils/logger');
 const geminiPool = require('../utils/geminiPool');
 
 const { generateOTP, sendOTPEmail, sendWelcomeEmail, sendPasswordResetEmail, sendAccountPendingEmail, sendAccountApprovedEmail, sendAccountRejectedEmail, sendContactEmail } = require('../utils/emailService');
+const { rejectDisposableEmail } = require('../utils/disposableEmailCheck');
 const { uploadIdDocs } = require('../middleware/upload');
 const {
   findUserByEmail, findUserById, findUserByUsername, findUserByPhone,
@@ -44,7 +45,7 @@ function getAge(dob) {
 // ════════════════════════════════════════════════════
 // POST /api/auth/send-otp
 // ════════════════════════════════════════════════════
-router.post('/api/auth/send-otp', async (req, res) => {
+router.post('/api/auth/send-otp', rejectDisposableEmail, async (req, res) => {
   try {
     const { email, password, confirmPassword, isGoogleSignup } = req.body;
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
@@ -98,7 +99,7 @@ router.post('/api/auth/send-otp', async (req, res) => {
 // ════════════════════════════════════════════════════
 // POST /api/auth/resend-otp
 // ════════════════════════════════════════════════════
-router.post('/api/auth/resend-otp', async (req, res) => {
+router.post('/api/auth/resend-otp', rejectDisposableEmail, async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email is required.' });

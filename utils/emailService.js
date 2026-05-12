@@ -1,34 +1,31 @@
 /**
  * utils/emailService.js
  *
- * FIVE DRIVERS — auto-detected from environment variables:
+ * WATERFALL DRIVER SYSTEM — drivers are tried in priority order.
+ * If a driver fails with a permanent account-level error it is marked
+ * as degraded and skipped for the rest of the process lifetime.
+ * The console driver is always the final fallback: OTPs are ALWAYS visible
+ * in Railway logs even when every cloud provider is unavailable.
  *
- *  1. MAILJET  ✅ RECOMMENDED for Railway / any cloud host
- *     Requires: MAILJET_API_KEY + MAILJET_SECRET_KEY + MAILJET_FROM (verified sender email)
- *     Free tier: 200 emails/day. No domain needed. No IP whitelisting.
- *     Sign up → https://app.mailjet.com
- *       API Keys: Account → API Keys → Create API Key (copy both public + secret)
- *       Sender:   Account → Senders & Domains → Add a Sender Email → verify via email link
+ * Driver priority: MAILJET → SENDGRID → BREVO → RESEND → SMTP → CONSOLE
  *
- *  2. BREVO
- *     Requires: BREVO_API_KEY + BREVO_FROM (verified sender email)
- *     ⚠ Brevo blocks requests from unrecognized IPs. On Railway (dynamic IPs) you MUST
- *       disable IP restriction: https://app.brevo.com/security/authorised_ips → remove all entries.
- *     Free tier: 300 emails/day.
+ * Setup (Railway env vars):
+ *   MAILJET  → MAILJET_API_KEY + MAILJET_SECRET_KEY + MAILJET_FROM
+ *   SENDGRID → SENDGRID_API_KEY + SENDGRID_FROM (recommended backup)
+ *              ✅ 100 emails/day free forever. No IP restrictions. No domain needed.
+ *              Sign up → https://signup.sendgrid.com
+ *              Verify sender → Settings → Sender Authentication → Single Sender Verification
+ *              API key → Settings → API Keys → Create API Key (Mail Send permission only)
+ *   BREVO    → BREVO_API_KEY + BREVO_FROM
+ *              ⚠ Disable IP restriction: https://app.brevo.com/security/authorised_ips
+ *   RESEND   → RESEND_API_KEY  (requires a verified domain, not just an email)
+ *   SMTP     → USE_REAL_EMAIL=true + EMAIL_USER + EMAIL_PASS
+ *              ⚠ Railway blocks SMTP ports 465/587
+ *   CONSOLE  → automatic fallback when no provider is configured or all fail
  *
- *  3. RESEND
- *     Requires: RESEND_API_KEY + a verified DOMAIN (not just an email address).
- *     Free tier: 3,000 emails/month.
- *
- *  4. SMTP (Gmail)
- *     Requires: USE_REAL_EMAIL=true + EMAIL_USER + EMAIL_PASS (16-char App Password)
- *     ⚠ Railway blocks outbound SMTP ports 465/587.
- *
- *  5. CONSOLE (zero network calls — development fallback)
- *     Active when none of the above are configured.
- *     OTPs and emails are printed clearly to the terminal.
- *
- * Priority: MAILJET > BREVO > RESEND > SMTP > CONSOLE
+ * Permanent failure detection (driver is skipped for remainder of uptime):
+ *   HTTP 401, "temporarily blocked", "account suspended", "sender not verified",
+ *   "domain not verified", "unrecognized IP"
  */
 
 'use strict';
@@ -36,15 +33,50 @@
 const nodemailer = require('nodemailer');
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Driver detection
+// Waterfall driver chain
 // ─────────────────────────────────────────────────────────────────────────────
-const DRIVER = (() => {
-  if (process.env.MAILJET_API_KEY && process.env.MAILJET_SECRET_KEY) return 'mailjet';
-  if (process.env.BREVO_API_KEY)                                      return 'brevo';
-  if (process.env.RESEND_API_KEY)                                     return 'resend';
-  if (process.env.USE_REAL_EMAIL === 'true')                          return 'smtp';
-  return 'console';
+
+/** Ordered list of drivers available in this process (console always last). */
+const DRIVER_CHAIN = (() => {
+  const chain = [];
+  if (process.env.MAILJET_API_KEY && process.env.MAILJET_SECRET_KEY) chain.push('mailjet');
+  if (process.env.SENDGRID_API_KEY)                                   chain.push('sendgrid');
+  if (process.env.BREVO_API_KEY)                                      chain.push('brevo');
+  if (process.env.RESEND_API_KEY)                                     chain.push('resend');
+  if (process.env.USE_REAL_EMAIL === 'true')                          chain.push('smtp');
+  chain.push('console'); // always present
+  return chain;
 })();
+
+/**
+ * Per-driver health. 'ok' → try normally. 'failed' → skip (permanent error).
+ * Resets only on process restart. This prevents hammering a blocked provider.
+ */
+const _driverHealth = Object.fromEntries(DRIVER_CHAIN.map(d => [d, 'ok']));
+
+/** The primary (first non-console) driver — used for startup log & getDriver(). */
+const DRIVER = DRIVER_CHAIN[0]; // may be 'console' if nothing is configured
+
+/**
+ * Returns true for errors that mean the driver itself is permanently broken
+ * for this process (account blocked, credentials invalid, IP banned, etc.).
+ * These are distinct from transient network errors; we skip the driver permanently.
+ */
+function _isPermanentDriverError(msg = '') {
+  const m = msg.toLowerCase();
+  return (
+    m.includes('401') ||
+    m.includes('temporarily blocked') ||
+    m.includes('account has been') ||
+    m.includes('account suspended') ||
+    m.includes('unrecognized ip') ||
+    m.includes('unauthorized') ||
+    m.includes('sender not verified') ||
+    m.includes('domain not verified') ||
+    m.includes('invalid api key') ||
+    m.includes('authentication failed')
+  );
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Lazy-loaded Resend client
@@ -99,10 +131,11 @@ function APP_URL()   { return process.env.APP_URL  || 'http://localhost:3000'; }
 
 function FROM_EMAIL() {
   return (
-    process.env.MAILJET_FROM ||
-    process.env.BREVO_FROM   ||
-    process.env.RESEND_FROM  ||
-    process.env.EMAIL_USER   ||
+    process.env.SENDGRID_FROM  ||
+    process.env.MAILJET_FROM   ||
+    process.env.BREVO_FROM     ||
+    process.env.RESEND_FROM    ||
+    process.env.EMAIL_USER     ||
     'noreply@pgadamis.gov.ph'
   );
 }
@@ -116,133 +149,170 @@ function FROM_ADDRESS() {
 // ─────────────────────────────────────────────────────────────────────────────
 (async () => {
   const from = FROM_EMAIL();
-  switch (DRIVER) {
-    case 'mailjet':
-      console.log(`✅ Email driver : Mailjet API (HTTPS) — from=${from}`);
-      break;
+  const labels = { mailjet: 'Mailjet API', sendgrid: 'SendGrid API', brevo: 'Brevo API', resend: 'Resend API', smtp: 'Gmail SMTP', console: 'Console (fallback)' };
 
-    case 'brevo':
-      console.log(`✅ Email driver : Brevo API (HTTPS) — from=${from}`);
-      console.warn('   ⚠  Brevo IP restriction: if you see IP errors disable all IPs at');
-      console.warn('      https://app.brevo.com/security/authorised_ips');
-      break;
+  if (DRIVER_CHAIN[0] === 'console') {
+    console.log('');
+    console.log('╔════════════════════════════════════════════════════════════╗');
+    console.log('║  📧  Email driver : CONSOLE (development mode)             ║');
+    console.log('║  Emails are NOT delivered. OTPs will appear here.          ║');
+    console.log('║  → Railway: set MAILJET_API_KEY + MAILJET_SECRET_KEY       ║');
+    console.log('║  → Gmail/VPS: set USE_REAL_EMAIL=true                      ║');
+    console.log('╚════════════════════════════════════════════════════════════╝');
+    console.log('');
+    return;
+  }
 
-    case 'resend':
-      console.log(`✅ Email driver : Resend API (HTTPS) — from=${from}`);
-      break;
+  const chainStr = DRIVER_CHAIN.map(d => labels[d] || d).join(' → ');
+  console.log(`✅ Email driver : ${labels[DRIVER_CHAIN[0]]} — from=${from}`);
+  console.log(`   Chain        : ${chainStr}`);
 
-    case 'smtp':
-      await initSMTP();
-      break;
-
-    case 'console':
-    default: {
-      console.log('');
-      console.log('╔════════════════════════════════════════════════════════════╗');
-      console.log('║  📧  Email driver : CONSOLE (development mode)             ║');
-      console.log('║  Emails are NOT delivered. OTPs will appear here.          ║');
-      console.log('║  → Railway: set MAILJET_API_KEY + MAILJET_SECRET_KEY       ║');
-      console.log('║  → Gmail/VPS: set USE_REAL_EMAIL=true                      ║');
-      console.log('╚════════════════════════════════════════════════════════════╝');
-      console.log('');
-      break;
-    }
+  if (DRIVER_CHAIN.includes('smtp')) await initSMTP();
+  if (DRIVER_CHAIN.includes('sendgrid')) {
+    console.log('   ✅ SendGrid: no IP restrictions, 100 emails/day free');
+  }
+  if (DRIVER_CHAIN.includes('brevo')) {
+    console.warn('   ⚠  Brevo: if IP errors appear, disable restrictions at');
+    console.warn('      https://app.brevo.com/security/authorised_ips');
+  }
+  if (DRIVER_CHAIN.includes('mailjet')) {
+    console.log('   💡 Mailjet: if account-blocked, contact https://app.mailjet.com/support');
+    console.log('      Auto-fallback to console is active — OTPs will always appear in logs.');
   }
 })().catch(console.error);
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Core send — routes to the active driver
+// Per-driver send implementations
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function _sendMailjet({ to, subject, html, text }) {
+  const basicAuth = Buffer.from(`${process.env.MAILJET_API_KEY}:${process.env.MAILJET_SECRET_KEY}`).toString('base64');
+  const res = await fetch('https://api.mailjet.com/v3.1/send', {
+    method: 'POST',
+    headers: { 'Authorization': `Basic ${basicAuth}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      Messages: [{
+        From:     { Email: FROM_EMAIL(), Name: APP_NAME() },
+        To:       [{ Email: to }],
+        Subject:  subject,
+        HTMLPart: html,
+        TextPart: text,
+      }],
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    const detail = data?.Messages?.[0]?.Errors?.[0]?.ErrorMessage || data?.ErrorMessage || JSON.stringify(data);
+    throw new Error(`Mailjet ${res.status}: ${detail}`);
+  }
+  return data?.Messages?.[0]?.To?.[0]?.MessageID;
+}
+
+async function _sendSendGrid({ to, subject, html, text }) {
+  const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
+    method:  'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.SENDGRID_API_KEY}`,
+      'Content-Type':  'application/json',
+    },
+    body: JSON.stringify({
+      personalizations: [{ to: [{ email: to }] }],
+      from:             { email: FROM_EMAIL(), name: APP_NAME() },
+      subject,
+      content: [
+        { type: 'text/plain', value: text },
+        { type: 'text/html',  value: html },
+      ],
+    }),
+  });
+  // SendGrid returns 202 Accepted on success with an empty body
+  if (!res.ok) {
+    let detail = '';
+    try {
+      const data = await res.json();
+      detail = data?.errors?.map(e => e.message).join(', ') || JSON.stringify(data);
+    } catch { detail = res.statusText; }
+    throw new Error(`SendGrid ${res.status}: ${detail}`);
+  }
+  // Extract message ID from response header (X-Message-Id)
+  return res.headers.get('X-Message-Id') || undefined;
+}
+
+async function _sendBrevo({ to, subject, html, text }) {
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: { 'accept': 'application/json', 'api-key': process.env.BREVO_API_KEY, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      sender: { name: APP_NAME(), email: FROM_EMAIL() },
+      to: [{ email: to }],
+      subject, htmlContent: html, textContent: text,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(`Brevo ${res.status}: ${data?.message || JSON.stringify(data)}`);
+  return data?.messageId;
+}
+
+async function _sendResend({ to, subject, html, text }) {
+  const resend = getResend();
+  const { data, error } = await resend.emails.send({ from: FROM_ADDRESS(), to: [to], subject, html, text });
+  if (error) throw new Error(`Resend: ${error.message || JSON.stringify(error)}`);
+  return data?.id;
+}
+
+async function _sendSMTP({ to, subject, html, text }) {
+  if (!smtpTransporter) throw new Error('SMTP transporter not available — check EMAIL_USER / EMAIL_PASS.');
+  const info = await smtpTransporter.sendMail({ from: FROM_ADDRESS(), to, subject, html, text });
+  return info.messageId;
+}
+
+function _sendConsole({ to, subject, text }) {
+  const border = '═'.repeat(60);
+  console.log('');
+  console.log(`╔${border}╗`);
+  console.log(`║  📬  [EMAIL→CONSOLE]  ${subject.slice(0, 37).padEnd(37)}  ║`);
+  console.log(`║  To: ${to.padEnd(54)}║`);
+  console.log(`╚${border}╝`);
+  if (text) console.log(text.trim());
+  console.log('');
+}
+
+const _DRIVER_FN = { mailjet: _sendMailjet, sendgrid: _sendSendGrid, brevo: _sendBrevo, resend: _sendResend, smtp: _sendSMTP };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Core send — waterfall across the driver chain
 // ─────────────────────────────────────────────────────────────────────────────
 async function _send({ to, subject, html, text }) {
-  switch (DRIVER) {
+  for (const driver of DRIVER_CHAIN) {
+    // ── Console fallback (always succeeds) ────────────────────────────────────
+    if (driver === 'console') {
+      _sendConsole({ to, subject, text });
+      return { success: true, driver: 'console' };
+    }
 
-    // ── Mailjet ───────────────────────────────────────────────────────────────
-    case 'mailjet': {
-      const basicAuth = Buffer.from(`${process.env.MAILJET_API_KEY}:${process.env.MAILJET_SECRET_KEY}`).toString('base64');
-      const res = await fetch('https://api.mailjet.com/v3.1/send', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Basic ${basicAuth}`,
-          'Content-Type':  'application/json',
-        },
-        body: JSON.stringify({
-          Messages: [{
-            From:     { Email: FROM_EMAIL(), Name: APP_NAME() },
-            To:       [{ Email: to }],
-            Subject:  subject,
-            HTMLPart: html,
-            TextPart: text,
-          }],
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        const detail = data?.Messages?.[0]?.Errors?.[0]?.ErrorMessage
-          || data?.ErrorMessage
-          || JSON.stringify(data);
-        throw new Error(`Mailjet ${res.status}: ${detail}`);
+    // ── Skip drivers that failed permanently this process lifetime ─────────────
+    if (_driverHealth[driver] === 'failed') continue;
+
+    try {
+      const msgId = await _DRIVER_FN[driver]({ to, subject, html, text });
+      return { success: true, driver, messageId: msgId };
+    } catch (err) {
+      const permanent = _isPermanentDriverError(err.message);
+      if (permanent) {
+        _driverHealth[driver] = 'failed';
+        console.error(`⚠️  [emailService] ${driver} permanently degraded: ${err.message}`);
+        console.warn(`   → Falling through to next driver in chain.`);
+      } else {
+        // Transient error — log and try next driver this time (don't mark as failed)
+        console.error(`⚠️  [emailService] ${driver} transient error: ${err.message}`);
+        console.warn(`   → Trying next driver.`);
       }
-      const msgId = data?.Messages?.[0]?.To?.[0]?.MessageID;
-      return { success: true, messageId: msgId };
-    }
-
-    // ── Brevo ─────────────────────────────────────────────────────────────────
-    case 'brevo': {
-      const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: {
-          'accept':       'application/json',
-          'api-key':      process.env.BREVO_API_KEY,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          sender:      { name: APP_NAME(), email: FROM_EMAIL() },
-          to:          [{ email: to }],
-          subject,
-          htmlContent: html,
-          textContent: text,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(`Brevo ${res.status}: ${data?.message || JSON.stringify(data)}`);
-      return { success: true, messageId: data?.messageId };
-    }
-
-    // ── Resend ────────────────────────────────────────────────────────────────
-    case 'resend': {
-      const resend = getResend();
-      const { data, error } = await resend.emails.send({
-        from: FROM_ADDRESS(),
-        to:   [to],
-        subject,
-        html,
-        text,
-      });
-      if (error) throw new Error(`Resend: ${error.message || JSON.stringify(error)}`);
-      return { success: true, messageId: data?.id };
-    }
-
-    // ── SMTP (Gmail) ──────────────────────────────────────────────────────────
-    case 'smtp': {
-      if (!smtpTransporter) throw new Error('SMTP transporter not available — check EMAIL_USER / EMAIL_PASS.');
-      const info = await smtpTransporter.sendMail({ from: FROM_ADDRESS(), to, subject, html, text });
-      return { success: true, messageId: info.messageId };
-    }
-
-    // ── Console ───────────────────────────────────────────────────────────────
-    case 'console':
-    default: {
-      const border = '═'.repeat(60);
-      console.log('');
-      console.log(`╔${border}╗`);
-      console.log(`║  📬  [DEV EMAIL]  ${subject.slice(0, 41).padEnd(41)}  ║`);
-      console.log(`║  To: ${to.padEnd(54)}║`);
-      console.log(`╚${border}╝`);
-      if (text) console.log(text.trim());
-      console.log('');
-      return { success: true };
+      // Continue to next driver in chain
     }
   }
+
+  // Should never reach here because console is always last
+  return { success: false, driver: 'none' };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -318,13 +388,13 @@ async function sendOTPEmail(toEmail, otp, firstName = 'there') {
   const text = `${appName} Verification\n\nHi ${firstName},\n\nYour verification code: ${otp}\n\nExpires in 10 minutes. Never share this code.\n\nIf you didn't request this, ignore this email.`;
   try {
     const result = await _send({ to: toEmail, subject: `${otp} — Your ${appName} verification code`, html: body, text });
-    if (DRIVER !== 'console') {
+    if (result.driver !== 'console') {
       const ts = new Date().toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      console.log(`  ✉  OTP sent [${DRIVER}] → ${toEmail} | code=${otp} | ${ts}${result.messageId ? ` | id=${result.messageId}` : ''}`);
+      console.log(`  ✉  OTP sent [${result.driver}] → ${toEmail} | code=${otp} | ${ts}${result.messageId ? ` | id=${result.messageId}` : ''}`);
     }
     return result;
   } catch (err) {
-    console.error(`❌ [emailService] sendOTPEmail → ${toEmail} | driver=${DRIVER} | ${err.message}`);
+    console.error(`❌ [emailService] sendOTPEmail → ${toEmail} | driver=${DRIVER_CHAIN[0]} | ${err.message}`);
     return { success: false };
   }
 }
@@ -341,10 +411,10 @@ async function sendPasswordResetEmail(toEmail, otp, firstName = 'there') {
   const text = `${appName} Password Reset\n\nHi ${firstName},\n\nYour reset code: ${otp}\n\nExpires in 10 minutes.\n\nIf you didn't request this, ignore this email.`;
   try {
     const result = await _send({ to: toEmail, subject: `${otp} — Your ${appName} password reset code`, html: body, text });
-    if (DRIVER !== 'console') console.log(`  🔑 Password reset sent [${DRIVER}] → ${toEmail}`);
+    if (result.driver !== 'console') console.log(`  🔑 Password reset sent [${result.driver}] → ${toEmail}`);
     return result;
   } catch (err) {
-    console.error(`❌ [emailService] sendPasswordResetEmail → ${toEmail} | driver=${DRIVER} | ${err.message}`);
+    console.error(`❌ [emailService] sendPasswordResetEmail → ${toEmail} | driver=${DRIVER_CHAIN[0]} | ${err.message}`);
     return { success: false };
   }
 }
@@ -363,10 +433,10 @@ async function sendWelcomeEmail(toEmail, firstName) {
   const text = `Welcome to ${appName}!\n\nHi ${firstName}, your email is verified.\n\nYour government ID is under review — we'll notify you within 24 hours once approved.\n\nThank you!`;
   try {
     const result = await _send({ to: toEmail, subject: `Welcome to ${appName}! 🎉`, html: body, text });
-    if (DRIVER !== 'console') console.log(`  🎉 Welcome email sent [${DRIVER}] → ${toEmail}`);
+    if (result.driver !== 'console') console.log(`  🎉 Welcome email sent [${result.driver}] → ${toEmail}`);
     return result;
   } catch (err) {
-    console.error(`❌ [emailService] sendWelcomeEmail → ${toEmail} | driver=${DRIVER} | ${err.message}`);
+    console.error(`❌ [emailService] sendWelcomeEmail → ${toEmail} | driver=${DRIVER_CHAIN[0]} | ${err.message}`);
     return { success: false };
   }
 }
@@ -384,10 +454,10 @@ async function sendAccountPendingEmail(toEmail, firstName) {
   const text = `Account Under Review — ${appName}\n\nHi ${firstName},\n\nYour account is under review. We'll notify you within 24 hours once approved.`;
   try {
     const result = await _send({ to: toEmail, subject: `[${appName}] Your account is under review`, html: body, text });
-    if (DRIVER !== 'console') console.log(`  ⏳ Account pending email sent [${DRIVER}] → ${toEmail}`);
+    if (result.driver !== 'console') console.log(`  ⏳ Account pending email sent [${result.driver}] → ${toEmail}`);
     return result;
   } catch (err) {
-    console.error(`❌ [emailService] sendAccountPendingEmail → ${toEmail} | driver=${DRIVER} | ${err.message}`);
+    console.error(`❌ [emailService] sendAccountPendingEmail → ${toEmail} | driver=${DRIVER_CHAIN[0]} | ${err.message}`);
     return { success: false };
   }
 }
@@ -406,10 +476,10 @@ async function sendAccountApprovedEmail(toEmail, firstName) {
   const text = `Account Approved — ${appName}\n\nHi ${firstName},\n\nYour account has been approved! Log in at: ${appUrl}`;
   try {
     const result = await _send({ to: toEmail, subject: `[${appName}] Your account has been approved ✅`, html: body, text });
-    if (DRIVER !== 'console') console.log(`  ✅ Account approved email sent [${DRIVER}] → ${toEmail}`);
+    if (result.driver !== 'console') console.log(`  ✅ Account approved email sent [${result.driver}] → ${toEmail}`);
     return result;
   } catch (err) {
-    console.error(`❌ [emailService] sendAccountApprovedEmail → ${toEmail} | driver=${DRIVER} | ${err.message}`);
+    console.error(`❌ [emailService] sendAccountApprovedEmail → ${toEmail} | driver=${DRIVER_CHAIN[0]} | ${err.message}`);
     return { success: false };
   }
 }
@@ -437,10 +507,10 @@ async function sendAccountRejectedEmail(toEmail, firstName, reason = '') {
   const text = `Account Not Approved — ${appName}\n\nHi ${firstName},\n\nYour account application was not approved.${reason ? `\n\nReason: ${reason}` : ''}\n\nContact the dormitory office for assistance.`;
   try {
     const result = await _send({ to: toEmail, subject: `[${appName}] Account application update`, html: body, text });
-    if (DRIVER !== 'console') console.log(`  ❌ Account rejected email sent [${DRIVER}] → ${toEmail}`);
+    if (result.driver !== 'console') console.log(`  ❌ Account rejected email sent [${result.driver}] → ${toEmail}`);
     return result;
   } catch (err) {
-    console.error(`❌ [emailService] sendAccountRejectedEmail → ${toEmail} | driver=${DRIVER} | ${err.message}`);
+    console.error(`❌ [emailService] sendAccountRejectedEmail → ${toEmail} | driver=${DRIVER_CHAIN[0]} | ${err.message}`);
     return { success: false };
   }
 }
@@ -466,10 +536,10 @@ async function sendContactEmail(toEmail, senderName, senderEmail, subject, messa
   const text = `New contact form message\n\nFrom: ${senderName} <${senderEmail}>\nSubject: ${subject}\n\n${message}`;
   try {
     const result = await _send({ to: toEmail, subject: `[${appName} Contact] ${subject}`, html: body, text });
-    if (DRIVER !== 'console') console.log(`  📩 Contact email sent [${DRIVER}] → ${toEmail}`);
+    if (result.driver !== 'console') console.log(`  📩 Contact email sent [${result.driver}] → ${toEmail}`);
     return result;
   } catch (err) {
-    console.error(`❌ [emailService] sendContactEmail → ${toEmail} | driver=${DRIVER} | ${err.message}`);
+    console.error(`❌ [emailService] sendContactEmail → ${toEmail} | driver=${DRIVER_CHAIN[0]} | ${err.message}`);
     return { success: false };
   }
 }
@@ -502,10 +572,10 @@ async function sendDormReminderEmail(toEmail, firstName, month, amount) {
   const text = `Dormitory Payment Reminder — ${appName}\n\nHi ${firstName},\n\nYour fee for ${monthLabel} is due.\nAmount Due: ₱${Number(amount).toLocaleString()}\n\nPlease contact the dormitory administrator.`;
   try {
     const result = await _send({ to: toEmail, subject: `[${appName}] Dormitory Payment Reminder — ${monthLabel}`, html: body, text });
-    if (DRIVER !== 'console') console.log(`  🏠 Dorm reminder sent [${DRIVER}] → ${toEmail}`);
+    if (result.driver !== 'console') console.log(`  🏠 Dorm reminder sent [${result.driver}] → ${toEmail}`);
     return result;
   } catch (err) {
-    console.error(`❌ [emailService] sendDormReminderEmail → ${toEmail} | driver=${DRIVER} | ${err.message}`);
+    console.error(`❌ [emailService] sendDormReminderEmail → ${toEmail} | driver=${DRIVER_CHAIN[0]} | ${err.message}`);
     return { success: false };
   }
 }
@@ -537,10 +607,10 @@ async function sendBedAssignedEmail(toEmail, firstName, roomNumber, bedNumber) {
   const text = `Bed Assignment — ${appName}\n\nHi ${firstName},\n\nYou have been assigned:\nRoom: ${roomNumber}\nBed:  ${bedNumber}\n\nContact the dormitory administrator for move-in procedures.`;
   try {
     const result = await _send({ to: toEmail, subject: `[${appName}] Bed Assignment — Room ${roomNumber}, Bed ${bedNumber}`, html: body, text });
-    if (DRIVER !== 'console') console.log(`  🏠 Bed assigned email sent [${DRIVER}] → ${toEmail}`);
+    if (result.driver !== 'console') console.log(`  🏠 Bed assigned email sent [${result.driver}] → ${toEmail}`);
     return result;
   } catch (err) {
-    console.error(`❌ [emailService] sendBedAssignedEmail → ${toEmail} | driver=${DRIVER} | ${err.message}`);
+    console.error(`❌ [emailService] sendBedAssignedEmail → ${toEmail} | driver=${DRIVER_CHAIN[0]} | ${err.message}`);
     return { success: false };
   }
 }
@@ -562,10 +632,10 @@ async function sendBedUnassignedEmail(toEmail, firstName, roomNumber, bedNumber)
   const text = `Bed Unassignment Notice — ${appName}\n\nHi ${firstName},\n\nYour bed assignment for Room ${roomNumber}, Bed ${bedNumber} has been removed.\n\nContact the dormitory office if you believe this is an error.`;
   try {
     const result = await _send({ to: toEmail, subject: `[${appName}] Bed Unassignment Notice — Room ${roomNumber}, Bed ${bedNumber}`, html: body, text });
-    if (DRIVER !== 'console') console.log(`  🏠 Bed unassigned email sent [${DRIVER}] → ${toEmail}`);
+    if (result.driver !== 'console') console.log(`  🏠 Bed unassigned email sent [${result.driver}] → ${toEmail}`);
     return result;
   } catch (err) {
-    console.error(`❌ [emailService] sendBedUnassignedEmail → ${toEmail} | driver=${DRIVER} | ${err.message}`);
+    console.error(`❌ [emailService] sendBedUnassignedEmail → ${toEmail} | driver=${DRIVER_CHAIN[0]} | ${err.message}`);
     return { success: false };
   }
 }
