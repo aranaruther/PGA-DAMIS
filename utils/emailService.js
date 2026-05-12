@@ -7,15 +7,14 @@
  * The console driver is always the final fallback: OTPs are ALWAYS visible
  * in Railway logs even when every cloud provider is unavailable.
  *
- * Driver priority: MAILJET → SENDGRID → BREVO → RESEND → SMTP → CONSOLE
+ * Driver priority: SENDGRID → BREVO → RESEND → SMTP → CONSOLE
  *
  * Setup (Railway env vars):
- *   MAILJET  → MAILJET_API_KEY + MAILJET_SECRET_KEY + MAILJET_FROM
- *   SENDGRID → SENDGRID_API_KEY + SENDGRID_FROM (recommended backup)
+ *   SENDGRID → SENDGRID_API_KEY + SENDGRID_FROM  ← PRIMARY
  *              ✅ 100 emails/day free forever. No IP restrictions. No domain needed.
- *              Sign up → https://signup.sendgrid.com
- *              Verify sender → Settings → Sender Authentication → Single Sender Verification
- *              API key → Settings → API Keys → Create API Key (Mail Send permission only)
+ *              Sign up  → https://signup.sendgrid.com
+ *              Verify   → Settings → Sender Authentication → Single Sender Verification
+ *              API key  → Settings → API Keys → Create API Key (Mail Send permission only)
  *   BREVO    → BREVO_API_KEY + BREVO_FROM
  *              ⚠ Disable IP restriction: https://app.brevo.com/security/authorised_ips
  *   RESEND   → RESEND_API_KEY  (requires a verified domain, not just an email)
@@ -39,11 +38,10 @@ const nodemailer = require('nodemailer');
 /** Ordered list of drivers available in this process (console always last). */
 const DRIVER_CHAIN = (() => {
   const chain = [];
-  if (process.env.MAILJET_API_KEY && process.env.MAILJET_SECRET_KEY) chain.push('mailjet');
-  if (process.env.SENDGRID_API_KEY)                                   chain.push('sendgrid');
-  if (process.env.BREVO_API_KEY)                                      chain.push('brevo');
-  if (process.env.RESEND_API_KEY)                                     chain.push('resend');
-  if (process.env.USE_REAL_EMAIL === 'true')                          chain.push('smtp');
+  if (process.env.SENDGRID_API_KEY)             chain.push('sendgrid');
+  if (process.env.BREVO_API_KEY)                chain.push('brevo');
+  if (process.env.RESEND_API_KEY)               chain.push('resend');
+  if (process.env.USE_REAL_EMAIL === 'true')    chain.push('smtp');
   chain.push('console'); // always present
   return chain;
 })();
@@ -113,7 +111,7 @@ async function initSMTP() {
   } catch (err) {
     console.error('❌ Gmail SMTP failed:', err.message);
     console.warn('   Make sure EMAIL_PASS is a Gmail App Password (16 chars, no spaces).');
-    console.warn('   ⚠  Railway blocks SMTP — use MAILJET_API_KEY instead.');
+    console.warn('   ⚠  Railway blocks SMTP — use SENDGRID_API_KEY instead.');
     smtpTransporter = null;
   }
 }
@@ -132,7 +130,6 @@ function APP_URL()   { return process.env.APP_URL  || 'http://localhost:3000'; }
 function FROM_EMAIL() {
   return (
     process.env.SENDGRID_FROM  ||
-    process.env.MAILJET_FROM   ||
     process.env.BREVO_FROM     ||
     process.env.RESEND_FROM    ||
     process.env.EMAIL_USER     ||
@@ -149,14 +146,14 @@ function FROM_ADDRESS() {
 // ─────────────────────────────────────────────────────────────────────────────
 (async () => {
   const from = FROM_EMAIL();
-  const labels = { mailjet: 'Mailjet API', sendgrid: 'SendGrid API', brevo: 'Brevo API', resend: 'Resend API', smtp: 'Gmail SMTP', console: 'Console (fallback)' };
+  const labels = { sendgrid: 'SendGrid API', brevo: 'Brevo API', resend: 'Resend API', smtp: 'Gmail SMTP', console: 'Console (fallback)' };
 
   if (DRIVER_CHAIN[0] === 'console') {
     console.log('');
     console.log('╔════════════════════════════════════════════════════════════╗');
     console.log('║  📧  Email driver : CONSOLE (development mode)             ║');
     console.log('║  Emails are NOT delivered. OTPs will appear here.          ║');
-    console.log('║  → Railway: set MAILJET_API_KEY + MAILJET_SECRET_KEY       ║');
+    console.log('║  → Railway: set SENDGRID_API_KEY + SENDGRID_FROM           ║');
     console.log('║  → Gmail/VPS: set USE_REAL_EMAIL=true                      ║');
     console.log('╚════════════════════════════════════════════════════════════╝');
     console.log('');
@@ -169,44 +166,17 @@ function FROM_ADDRESS() {
 
   if (DRIVER_CHAIN.includes('smtp')) await initSMTP();
   if (DRIVER_CHAIN.includes('sendgrid')) {
-    console.log('   ✅ SendGrid: no IP restrictions, 100 emails/day free');
+    console.log('   ✅ SendGrid: no IP restrictions, 100 emails/day free forever');
   }
   if (DRIVER_CHAIN.includes('brevo')) {
     console.warn('   ⚠  Brevo: if IP errors appear, disable restrictions at');
     console.warn('      https://app.brevo.com/security/authorised_ips');
-  }
-  if (DRIVER_CHAIN.includes('mailjet')) {
-    console.log('   💡 Mailjet: if account-blocked, contact https://app.mailjet.com/support');
-    console.log('      Auto-fallback to console is active — OTPs will always appear in logs.');
   }
 })().catch(console.error);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Per-driver send implementations
 // ─────────────────────────────────────────────────────────────────────────────
-
-async function _sendMailjet({ to, subject, html, text }) {
-  const basicAuth = Buffer.from(`${process.env.MAILJET_API_KEY}:${process.env.MAILJET_SECRET_KEY}`).toString('base64');
-  const res = await fetch('https://api.mailjet.com/v3.1/send', {
-    method: 'POST',
-    headers: { 'Authorization': `Basic ${basicAuth}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      Messages: [{
-        From:     { Email: FROM_EMAIL(), Name: APP_NAME() },
-        To:       [{ Email: to }],
-        Subject:  subject,
-        HTMLPart: html,
-        TextPart: text,
-      }],
-    }),
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    const detail = data?.Messages?.[0]?.Errors?.[0]?.ErrorMessage || data?.ErrorMessage || JSON.stringify(data);
-    throw new Error(`Mailjet ${res.status}: ${detail}`);
-  }
-  return data?.Messages?.[0]?.To?.[0]?.MessageID;
-}
 
 async function _sendSendGrid({ to, subject, html, text }) {
   const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
@@ -277,7 +247,7 @@ function _sendConsole({ to, subject, text }) {
   console.log('');
 }
 
-const _DRIVER_FN = { mailjet: _sendMailjet, sendgrid: _sendSendGrid, brevo: _sendBrevo, resend: _sendResend, smtp: _sendSMTP };
+const _DRIVER_FN = { sendgrid: _sendSendGrid, brevo: _sendBrevo, resend: _sendResend, smtp: _sendSMTP };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Core send — waterfall across the driver chain
