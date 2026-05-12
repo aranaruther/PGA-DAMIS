@@ -359,7 +359,13 @@ httpServer.listen(PORT, async () => {
     ? `✔ Gemini (free) · ${poolStatus.keyCount} key${poolStatus.keyCount>1?'s':''} · ${poolStatus.keyCount*poolStatus.rpdLimit} req/day total${hasGithub ? ' · DeepSeek fallback ✔' : ''}`
     : hasGithub ? '✔ DeepSeek-V3 (GitHub Models)' : '✖ NOT configured';
   log.info(`AI Moderation: ${aiStatus}`);
-  log.info(`Email        : ${process.env.USE_REAL_EMAIL === 'true' ? `✔ Gmail (${process.env.EMAIL_USER})` : '✔ Ethereal (dev)'}`);
+  const { getDriver } = require('./utils/emailService');
+  const emailDriverLabel = {
+    resend:  `✔ Resend API (${process.env.RESEND_FROM || process.env.EMAIL_USER || 'HTTPS'})`,
+    smtp:    `✔ Gmail SMTP (${process.env.EMAIL_USER})`,
+    console: '⚠ Console/dev — no real delivery (set RESEND_API_KEY for production)',
+  }[getDriver()] || '?';
+  log.info(`Email        : ${emailDriverLabel}`);
   log.divider();
 
   // Auto-create admin account from .env if not already present
