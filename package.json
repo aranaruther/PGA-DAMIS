@@ -1,7 +1,7 @@
 {
-  "name": "connecthub",
+  "name": "pga-damis",
   "version": "4.0.0",
-  "description": "ConnectHub Community Module — Web Systems & Technologies (Admin & Moderation Edition)",
+  "description": "PGA-DAMIS — Provincial Government of Aurora Dormitory Application & Management Information System",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

@@ -32,7 +32,7 @@ function ask(iface, q) { return new Promise(r => iface.question(q, r)); }
 
 function banner() {
   console.log('\n╔══════════════════════════════════════════╗');
-  console.log('║   ConnectHub — Admin Account Manager     ║');
+  console.log('║   PGA-DAMIS — Admin Account Manager      ║');
   console.log('╚══════════════════════════════════════════╝\n');
 }
 

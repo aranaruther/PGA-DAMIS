@@ -72,15 +72,34 @@ Copy `.env.example` to `.env` and fill in your values. **Never commit `.env` to 
 | `APP_URL` | Base URL (used in email links) | `http://localhost:3000` |
 | `SESSION_SECRET` | Express session signing secret | — |
 
-### Email (Gmail SMTP via Nodemailer)
+### Email — Waterfall Driver System
+
+The system tries providers in order: **SendGrid → Brevo → Resend → SMTP → Console**.  
+The first configured driver wins; if it fails permanently (blocked, bad key), the next is tried automatically.  
+Console is always the final fallback — OTPs appear in Railway logs so they are never lost.
+
+**Railway / Production — recommended driver: SendGrid**
 
 | Variable | Description |
 |---|---|
-| `EMAIL_USER` | Gmail address used to send system emails |
-| `EMAIL_PASS` | Gmail App Password (16 chars, **not** your account password) |
-| `USE_REAL_EMAIL` | `true` = Gmail SMTP · `false` = Ethereal fake inbox (dev) |
+| `SENDGRID_API_KEY` | API key from SendGrid dashboard (**Mail Send** permission only) |
+| `SENDGRID_FROM` | Verified sender address (e.g. `noreply@pgadamis.gov.ph`) |
 
-> Get an App Password at: **myaccount.google.com → Security → App passwords**
+> Free tier: **100 emails/day forever**, no IP restrictions, no domain required.  
+> Sign up → https://signup.sendgrid.com | Verify sender → Settings → Sender Authentication
+
+**Alternative drivers**
+
+| Variable | Description |
+|---|---|
+| `BREVO_API_KEY` | Brevo SMTP API key — disable IP restriction at https://app.brevo.com/security/authorised_ips |
+| `BREVO_FROM` | Verified Brevo sender address |
+| `RESEND_API_KEY` | Resend API key — requires a verified **domain** (not just an email) |
+| `EMAIL_USER` | Gmail address (fallback / dev) |
+| `EMAIL_PASS` | Gmail App Password — **⚠ Railway blocks SMTP ports 465/587, use SendGrid instead** |
+| `USE_REAL_EMAIL` | `true` to enable the Gmail SMTP driver |
+
+> Get a Gmail App Password: **myaccount.google.com → Security → App passwords**
 
 ### Google OAuth 2.0
 

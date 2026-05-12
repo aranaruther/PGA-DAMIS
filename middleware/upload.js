@@ -70,7 +70,7 @@ async function processPostImage(req, res, next) {
   if (!req.file) return next();
   try {
     const buf = await resizeImage(req.file.buffer, { width: 1200, quality: 80 });
-    req.cloudinaryUrl = hasCloudinary ? (await toCloudinary(buf, 'connecthub/posts')).secure_url : toDataUrl(buf, req.file.mimetype);
+    req.cloudinaryUrl = hasCloudinary ? (await toCloudinary(buf, 'pga-damis/posts')).secure_url : toDataUrl(buf, req.file.mimetype);
     next();
   } catch (err) { console.error('Post image error:', err.message); res.status(500).json({ error: 'Image upload failed.' }); }
 }
@@ -79,7 +79,7 @@ async function processAvatar(req, res, next) {
   if (!req.file) return next();
   try {
     const buf = await resizeImage(req.file.buffer, { width: 400, height: 400, fit: 'cover', quality: 85 });
-    req.cloudinaryUrl = hasCloudinary ? (await toCloudinary(buf, 'connecthub/avatars')).secure_url : toDataUrl(buf, req.file.mimetype);
+    req.cloudinaryUrl = hasCloudinary ? (await toCloudinary(buf, 'pga-damis/avatars')).secure_url : toDataUrl(buf, req.file.mimetype);
     next();
   } catch (err) { console.error('Avatar error:', err.message); res.status(500).json({ error: 'Avatar upload failed.' }); }
 }
@@ -88,7 +88,7 @@ async function processCover(req, res, next) {
   if (!req.file) return next();
   try {
     const buf = await resizeImage(req.file.buffer, { width: 1500, height: 500, fit: 'cover', quality: 80 });
-    req.cloudinaryUrl = hasCloudinary ? (await toCloudinary(buf, 'connecthub/covers')).secure_url : toDataUrl(buf, req.file.mimetype);
+    req.cloudinaryUrl = hasCloudinary ? (await toCloudinary(buf, 'pga-damis/covers')).secure_url : toDataUrl(buf, req.file.mimetype);
     next();
   } catch (err) { console.error('Cover error:', err.message); res.status(500).json({ error: 'Cover upload failed.' }); }
 }
@@ -160,7 +160,7 @@ async function processIdDocument(req, res, next) {
       }
 
       urls['avatar'] = hasCloudinary
-        ? (await toCloudinary(buf, 'connecthub/avatars')).secure_url
+        ? (await toCloudinary(buf, 'pga-damis/avatars')).secure_url
         : toDataUrl(buf, avatarFile.mimetype);
       log.upload(`Avatar stored: ${hasCloudinary ? urls['avatar'].slice(0,70)+'…' : '[base64]'}`);
     }

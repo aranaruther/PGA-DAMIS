@@ -1,14 +1,17 @@
 /**
- * server.js — ConnectHub Entry Point (v4 — Admin & Moderation Edition)
+ * server.js — PGA-DAMIS Entry Point
  *
- * New in v4:
- *   - Admin account creation (npm run create-admin)
+ * Provincial Government of Aurora — Dormitory Application &
+ * Management Information System
+ *
+ * Features:
+ *   - Admin account management & approval workflow
  *   - Post moderation queue (pending → approved/rejected)
- *   - AI-assisted content moderation (Claude API)
- *   - ID verification workflow with file uploads
- *   - User ban/unban
- *   - Audit logging
- *   - Banned users blocked at login
+ *   - AI-assisted content moderation (Gemini pool)
+ *   - ID verification workflow with document uploads
+ *   - Dormitory bed assignment & billing management
+ *   - Maintenance requests & utility bill tracking
+ *   - User ban/unban, audit logging, real-time via Socket.IO
  */
 
 require('dotenv').config();
@@ -400,7 +403,16 @@ httpServer.listen(PORT, async () => {
   const { db: dbRaw, getSetting, setSetting, createNotification } = require('./utils/db');
   const { sendDormReminderEmail } = require('./utils/emailService');
 
+  // Guard: if a run is already in progress (e.g. slow email sends),
+  // skip the next interval tick rather than stacking executions.
+  let _isRunning = false;
+
   async function runAutoRemind() {
+    if (_isRunning) {
+      log.warn('[AutoRemind] Previous run still in progress — skipping this tick.');
+      return;
+    }
+    _isRunning = true;
     try {
       const enabled = getSetting('auto_billing_remind', '1');
       if (enabled === '0') { return; }
@@ -440,6 +452,8 @@ httpServer.listen(PORT, async () => {
       log.billing(`🤖 Auto-remind ran for ${month} — ${sent} student${sent !== 1 ? 's' : ''} notified (${daysLeft} day${daysLeft !== 1 ? 's' : ''} left in month)`);
     } catch (e) {
       log.warn(`[AutoRemind] Scheduler error: ${e.message}`);
+    } finally {
+      _isRunning = false;
     }
   }
 

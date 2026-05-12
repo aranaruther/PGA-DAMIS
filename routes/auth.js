@@ -479,9 +479,14 @@ router.post('/api/auth/contact-admin', async (req, res) => {
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
       return res.status(400).json({ error: 'Invalid email address.' });
 
+    // Send to the configured admin inbox, not back to the submitter
+    const toEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER || process.env.SENDGRID_FROM;
+    const subject = `Support message from ${name?.trim() || 'Anonymous'}`;
     const result = await sendContactEmail(
-      name?.trim()    || 'Anonymous',
-      email?.trim()   || null,
+      toEmail,
+      name?.trim()  || 'Anonymous',
+      email?.trim() || null,
+      subject,
       message.trim()
     );
     if (!result.success)
@@ -536,7 +541,7 @@ router.post('/api/auth/support-chat', async (req, res) => {
     if (!hasGemini && !hasGithub) {
       return res.json({
         reply: "I'm PGA-DAMIS Support. Our AI assistant isn't configured yet. " +
-               "Please email us at **" + (process.env.EMAIL_USER || 'support@connecthub.local') + "** and we'll get back to you shortly.",
+               "Please email us at **" + (process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'support@pgadamis.local') + "** and we'll get back to you shortly.",
         escalate: true,
       });
     }
@@ -552,7 +557,7 @@ router.post('/api/auth/support-chat', async (req, res) => {
         const totalLimit = poolStatus.keyCount * poolStatus.rpdLimit;
         log.aiError(`Support chat: all ${poolStatus.keyCount} Gemini key(s) exhausted. Resets in ${resetStr}.`);
         return res.json({
-          reply: `⚠️ The AI support chat has reached its **daily limit (${totalLimit} messages across ${poolStatus.keyCount} key${poolStatus.keyCount>1?'s':''})**. It resets in **${resetStr}**. For urgent help, email **${process.env.EMAIL_USER || 'support@connecthub.local'}**.`,
+          reply: `⚠️ The AI support chat has reached its **daily limit (${totalLimit} messages across ${poolStatus.keyCount} key${poolStatus.keyCount>1?'s':''})**. It resets in **${resetStr}**. For urgent help, email **${process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'support@pgadamis.local'}**.`,
           escalate: true,
           dailyLimitReached: true,
           used: totalLimit,
@@ -562,7 +567,7 @@ router.post('/api/auth/support-chat', async (req, res) => {
       }
     }
 
-    const adminEmail   = process.env.EMAIL_USER || 'support@connecthub.local';
+    const adminEmail   = process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'support@pgadamis.local';
     const appName      = process.env.APP_NAME || 'PGA-DAMIS';
     const systemPrompt = `You are the ${appName} Support Assistant, a friendly helpful AI for a Filipino social community platform.`
       + ` The admin support email is: ${adminEmail}.`
@@ -637,7 +642,7 @@ router.post('/api/auth/support-chat', async (req, res) => {
             const totalLimit = ps.keyCount * ps.rpdLimit;
             getAiUsage().count = AI_DAILY_LIMIT;
             return res.json({
-              reply: `⚠️ The AI support chat has reached its **daily limit (${totalLimit} messages across ${ps.keyCount} key${ps.keyCount>1?'s':''})**. It resets in **${resetStr}**. For urgent help, email **${process.env.EMAIL_USER||'support@connecthub.local'}**.`,
+              reply: `⚠️ The AI support chat has reached its **daily limit (${totalLimit} messages across ${ps.keyCount} key${ps.keyCount>1?'s':''})**. It resets in **${resetStr}**. For urgent help, email **${process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'support@pgadamis.local'}**.`,
               escalate: true, dailyLimitReached: true,
               used: totalLimit, limit: totalLimit, resetsInSecs: secsUntilReset,
             });
@@ -687,7 +692,7 @@ router.post('/api/auth/support-chat', async (req, res) => {
   } catch (err) {
     log.aiError(`Support chat exception: ${err.message}`);
     return res.json({
-      reply: "I'm having trouble right now. Please email us at **" + (process.env.EMAIL_USER || 'support@connecthub.local') + "** and we'll help you shortly.",
+      reply: "I'm having trouble right now. Please email us at **" + (process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'support@pgadamis.local') + "** and we'll help you shortly.",
       escalate: true,
     });
   }

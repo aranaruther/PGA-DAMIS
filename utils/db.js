@@ -26,6 +26,14 @@ const db = new Database(path.join(DATA_DIR, 'connecthub.db'));
 // ── Performance: WAL mode makes reads faster ──────────
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
+// 16 MB page cache (negative = KiB). Dramatically speeds up complex JOINs
+// on tables like users + posts + notifications without extra memory pressure.
+db.pragma('cache_size = -16384');
+// NORMAL durability: fsync only at checkpoints, not every commit.
+// Safe for Railway's hosted filesystem; trades theoretical crash-recovery
+// window (milliseconds) for ~3× write throughput. WAL already provides
+// crash safety for readers.
+db.pragma('synchronous = NORMAL');
 
 // ══════════════════════════════════════════════════════
 // SCHEMA
@@ -325,6 +333,9 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_follows_follower  ON follows(follower_id);
   CREATE INDEX IF NOT EXISTS idx_follows_following ON follows(following_id);
   CREATE INDEX IF NOT EXISTS idx_notif_user    ON notifications(user_id, is_read);
+  CREATE INDEX IF NOT EXISTS idx_users_phone   ON users(phone);
+  CREATE INDEX IF NOT EXISTS idx_users_email   ON users(email);
+  CREATE INDEX IF NOT EXISTS idx_users_status  ON users(account_status, is_active);
 `);
 
 // ── Safe migrations (ALTER TABLE is idempotent via try/catch) ─────────
@@ -486,16 +497,17 @@ function findUserByUsername(username) {
 }
 
 function findUserByPhone(phone) {
-  function toTen(p) {
-    const d = String(p).replace(/\D/g, '');
-    if (d.length === 10) return d;
-    if (d.length === 11 && d[0] === '0') return d.slice(1);
-    if (d.length === 12 && d.startsWith('63')) return d.slice(2);
-    return d;
-  }
-  const target = toTen(phone);
-  const all = db.prepare('SELECT * FROM users').all();
-  const row = all.find(u => u.phone && toTen(u.phone) === target);
+  // Normalize any input format → +63XXXXXXXXXX (the canonical storage format)
+  const digits = String(phone).replace(/\D/g, '');
+  let ten;
+  if      (digits.length === 10 && digits[0] === '9')  ten = digits;
+  else if (digits.length === 11 && digits[0] === '0')  ten = digits.slice(1);
+  else if (digits.length === 12 && digits.startsWith('63')) ten = digits.slice(2);
+  else ten = digits; // pass through for unusual formats
+  const normalized = '+63' + ten;
+
+  // Direct indexed lookup — phones are stored as +63XXXXXXXXXX
+  const row = db.prepare('SELECT * FROM users WHERE phone = ?').get(normalized);
   return row ? dbRowToUser(row) : undefined;
 }
 
@@ -1393,18 +1405,25 @@ function getMessages(userAId, userBId, limit = 100) {
 }
 
 function getConversations(userId) {
-  // Get the most recent message per conversation partner
+  // Correct approach: use MAX(rowid) in a subquery to get the latest message
+  // per partner, then JOIN back for full row data.
+  // The old GROUP BY … HAVING m.created_at = MAX(m.created_at) pattern is a
+  // SQLite ambiguity anti-pattern — non-aggregated columns take an arbitrary
+  // row value, not the row where created_at is maximum.
   const rows = db.prepare(`
-    SELECT
-      m.id, m.content, m.created_at, m.is_read,
-      m.sender_id, m.receiver_id,
-      CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END AS partner_id,
-      u.first_name, u.last_name, u.username, u.avatar
-    FROM messages m
-    JOIN users u ON u.id = CASE WHEN m.sender_id = ? THEN m.receiver_id ELSE m.sender_id END
-    WHERE m.sender_id = ? OR m.receiver_id = ?
-    GROUP BY partner_id
-    HAVING m.created_at = MAX(m.created_at)
+    SELECT m.id, m.content, m.created_at, m.is_read,
+           m.sender_id, m.receiver_id, latest.partner_id,
+           u.first_name, u.last_name, u.username, u.avatar
+    FROM (
+      SELECT
+        CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END AS partner_id,
+        MAX(rowid) AS latest_rowid
+      FROM messages
+      WHERE sender_id = ? OR receiver_id = ?
+      GROUP BY CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END
+    ) latest
+    JOIN messages m ON m.rowid = latest.latest_rowid
+    JOIN users u ON u.id = latest.partner_id
     ORDER BY m.created_at DESC
   `).all(userId, userId, userId, userId);
 
