@@ -39,7 +39,7 @@ async function seedOneAdmin({ prefix, index }) {
     return;
   }
 
-  // Already exists — check role and active status
+  // Already exists — check role, status, and sync names if env changed
   const existing = findUserByEmail(email);
   if (existing) {
     if (existing.role !== 'admin' && existing.role !== 'superadmin') {
@@ -49,7 +49,23 @@ async function seedOneAdmin({ prefix, index }) {
     } else if (existing.accountStatus !== 'approved') {
       log.warn(`Admin seed [slot ${index}]: @${existing.username} (${email}) exists but status="${existing.accountStatus}" — cannot log in!`);
     } else {
-      log.info(`Admin seed [slot ${index}]: @${existing.username} (${email}) already exists ✔`);
+      // Sync names if env vars differ from what is stored (e.g. was seeded with wrong default)
+      const envFirst  = get('FIRST_NAME')  || 'Admin';
+      const envMiddle = get('MIDDLE_NAME') || '';
+      const envLast   = get('LAST_NAME')   || '';
+      const needsUpdate =
+        existing.firstName  !== envFirst  ||
+        existing.middleName !== envMiddle ||
+        existing.lastName   !== envLast;
+      if (needsUpdate) {
+        const { db } = require('./db');
+        db.prepare(
+          "UPDATE users SET first_name=?, middle_name=?, last_name=?, updated_at=datetime('now') WHERE id=?"
+        ).run(envFirst, envMiddle, envLast, existing.id);
+        log.info(`Admin seed [slot ${index}]: @${existing.username} name synced → ${[envFirst, envMiddle, envLast].filter(Boolean).join(' ')}`);
+      } else {
+        log.info(`Admin seed [slot ${index}]: @${existing.username} (${email}) already exists ✔`);
+      }
     }
     return;
   }
@@ -67,7 +83,7 @@ async function seedOneAdmin({ prefix, index }) {
     createUser({
       firstName:     get('FIRST_NAME')  || 'Admin',
       middleName:    get('MIDDLE_NAME') || '',
-      lastName:      get('LAST_NAME')   || 'User',
+      lastName:      get('LAST_NAME')   || '',
       username,
       email,
       password:      hashed,

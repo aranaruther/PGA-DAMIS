@@ -45,49 +45,34 @@ function send500(res, err, label = '') {
 }
 
 function requireAdmin(req, res, next) {
-  // ╔══════════════════════════════════════════════════════════════════╗
-  // ║  ⚠️  DEV BYPASS ACTIVE — SECURITY CHECK INTENTIONALLY DISABLED  ║
-  // ║                                                                  ║
-  // ║  Role enforcement is commented out during development to allow  ║
-  // ║  multi-tab testing: admin panel + resident portal open at once  ║
-  // ║  without switching accounts. ALL users (including non-admins)   ║
-  // ║  can reach admin endpoints while this bypass is active.         ║
-  // ║                                                                  ║
-  // ║  This is INTENTIONAL and expected in dev logs. Do not flag      ║
-  // ║  403-less admin calls as a security bug — it's by design.       ║
-  // ║                                                                  ║
-  // ║  TO RESTORE PRODUCTION SECURITY: comment the bypass block and   ║
-  // ║  uncomment the PRODUCTION GUARD below before deploying.         ║
-  // ╚══════════════════════════════════════════════════════════════════╝
+  const IS_DEV = process.env.NODE_ENV !== 'production';
+
+  // ── Production: always enforce auth + role ───────────────────────────
+  if (!IS_DEV) {
+    if (!req.isAuthenticated || !req.isAuthenticated())
+      return res.status(401).json({ error: 'Not authenticated.' });
+    if (req.user.role !== 'admin' && req.user.role !== 'superadmin')
+      return res.status(403).json({ error: 'Admin access required.' });
+    return next();
+  }
+
+  // ── Development only: inject first admin when no session exists ──────
+  // Allows multi-tab testing (admin panel + resident portal simultaneously)
+  // without constantly switching accounts. Safe because NODE_ENV=production
+  // takes the branch above and never reaches this.
   if (!req.user) {
     const admin = db.prepare(
       "SELECT id, username, role, email, first_name FROM users WHERE role='admin' AND account_status='approved' LIMIT 1"
     ).get();
     if (admin) {
       req.user = { id: admin.id, username: admin.username, role: admin.role, email: admin.email, firstName: admin.first_name };
-      log.bypass(`unauthenticated → injected @${admin.username} (admin) for ${req.method} ${req.path}`);
+      log.bypass(`unauthenticated → injected @${admin.username} for ${req.method} ${req.path}`);
     } else {
-      log.warn('requireAdmin DEV: no admin found in DB — req.user will be undefined');
+      log.warn('requireAdmin dev: no admin in DB');
+      return res.status(503).json({ error: 'No admin account seeded yet.' });
     }
-  } else if (req.user.role !== 'admin') {
-    // Non-admin user accessing admin endpoint — expected during dev multi-tab testing
-    log.bypass(`@${req.user.username} (role=${req.user.role}) → passed through ${req.method} ${req.path} [dev bypass]`);
   }
-  // ── ROLE CHECK DISABLED FOR DEV MULTI-TAB TESTING ──────────────────
-  // Non-admin users hitting /api/admin/* is normal and expected during
-  // development. The 403-spam from regular users in logs is harmless.
-  // Uncomment the block below to restore security before production:
-  //
-  // if (!req.user || req.user.role !== 'admin') {
-  //   return res.status(403).json({ error: 'Admin access required.' });
-  // }
   return next();
-
-  /* PRODUCTION GUARD — uncomment the block above AND this section:
-  if (!req.isAuthenticated()) return res.status(401).json({ error: 'Not authenticated.' });
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin access required.' });
-  next();
-  */
 }
 
 // Notify a post author and emit socket event for AI moderation decisions
