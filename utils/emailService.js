@@ -1,24 +1,28 @@
 /**
  * utils/emailService.js
  *
- * THREE DRIVERS — auto-detected from environment variables:
+ * FOUR DRIVERS — auto-detected from environment variables:
  *
- *  1. RESEND   (recommended for Railway / any cloud host)
+ *  1. BREVO    (easiest for Railway — no domain needed, just verify sender email)
+ *     Set BREVO_API_KEY in Railway variables.
+ *     Free tier: 300 emails/day, no domain required.
+ *     Sign up at https://brevo.com → SMTP & API → API Keys
+ *     Then verify your sender: Senders & IP → Senders → Add a sender
+ *     Set BREVO_FROM to your verified sender email (e.g. rutherfordc.arana@gmail.com)
+ *
+ *  2. RESEND   (requires a verified domain, not just an email)
  *     Set RESEND_API_KEY in Railway variables.
- *     Uses HTTPS API — never blocked by firewalls or hosting platforms.
- *     Free tier: 3,000 emails/month, 100/day.
- *     Sign up at https://resend.com  (takes ~2 minutes)
+ *     Free tier: 3,000 emails/month. Requires domain at resend.com/domains.
  *
- *  2. SMTP     (Gmail, works on traditional VPS / local)
+ *  3. SMTP     (Gmail — works on VPS/local, blocked on Railway)
  *     Set USE_REAL_EMAIL=true + EMAIL_USER + EMAIL_PASS (16-char App Password).
- *     ⚠ Railway blocks outbound SMTP (ports 465/587) — use Resend there instead.
+ *     ⚠ Railway blocks outbound SMTP ports 465/587.
  *
- *  3. CONSOLE  (development fallback — zero network calls)
- *     Active when neither RESEND_API_KEY nor USE_REAL_EMAIL=true is set.
- *     OTPs are printed to the terminal in a clearly visible box.
- *     Safe on Railway: no SMTP timeout, instant response.
+ *  4. CONSOLE  (development fallback — zero network calls)
+ *     Active when none of the above are configured.
+ *     OTPs print to the terminal. Safe on Railway, instant response.
  *
- * Priority:  RESEND_API_KEY  >  USE_REAL_EMAIL=true  >  CONSOLE
+ * Priority:  BREVO_API_KEY  >  RESEND_API_KEY  >  USE_REAL_EMAIL=true  >  CONSOLE
  */
 
 const nodemailer = require('nodemailer');
@@ -27,6 +31,7 @@ const nodemailer = require('nodemailer');
 // Driver detection
 // ─────────────────────────────────────────────────────
 const DRIVER = (() => {
+  if (process.env.BREVO_API_KEY)            return 'brevo';
   if (process.env.RESEND_API_KEY)           return 'resend';
   if (process.env.USE_REAL_EMAIL === 'true') return 'smtp';
   return 'console';
@@ -73,6 +78,10 @@ async function initSMTP() {
 // ─────────────────────────────────────────────────────
 (async () => {
   switch (DRIVER) {
+    case 'brevo':
+      console.log(`✅ Email driver : Brevo API (HTTPS) — from=${process.env.BREVO_FROM || process.env.EMAIL_USER || '(set BREVO_FROM)'}`);
+      break;
+
     case 'resend':
       console.log(`✅ Email driver : Resend (HTTPS API) — from=${process.env.RESEND_FROM || process.env.EMAIL_USER || 'noreply@pgadamis.gov.ph'}`);
       break;
@@ -108,7 +117,11 @@ function generateOTP() {
 const APP_NAME     = () => process.env.APP_NAME || 'PGA-DAMIS';
 const APP_URL      = () => process.env.APP_URL  || 'http://localhost:3000';
 const FROM_ADDRESS = () =>
-  `"${APP_NAME()}" <${process.env.RESEND_FROM || process.env.EMAIL_USER || 'noreply@pgadamis.gov.ph'}>`;
+  `"${APP_NAME()}" <${process.env.BREVO_FROM || process.env.RESEND_FROM || process.env.EMAIL_USER || 'noreply@pgadamis.gov.ph'}>`;
+
+// Bare sender email (no display name) for API drivers
+const FROM_EMAIL = () =>
+  process.env.BREVO_FROM || process.env.RESEND_FROM || process.env.EMAIL_USER || 'noreply@pgadamis.gov.ph';
 
 /**
  * Core send — routes to the active driver.
@@ -117,6 +130,28 @@ const FROM_ADDRESS = () =>
  */
 async function _send({ to, subject, html, text }) {
   switch (DRIVER) {
+
+    case 'brevo': {
+      // Brevo transactional email REST API — no npm package needed, uses native fetch
+      const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method:  'POST',
+        headers: {
+          'accept':       'application/json',
+          'api-key':      process.env.BREVO_API_KEY,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          sender:      { name: APP_NAME(), email: FROM_EMAIL() },
+          to:          [{ email: to }],
+          subject,
+          htmlContent: html,
+          textContent: text,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || `Brevo error ${res.status}`);
+      return { success: true, messageId: data?.messageId };
+    }
 
     case 'resend': {
       const resend = getResend();

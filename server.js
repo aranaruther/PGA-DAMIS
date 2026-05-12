@@ -361,9 +361,10 @@ httpServer.listen(PORT, async () => {
   log.info(`AI Moderation: ${aiStatus}`);
   const { getDriver } = require('./utils/emailService');
   const emailDriverLabel = {
-    resend:  `✔ Resend API (${process.env.RESEND_FROM || process.env.EMAIL_USER || 'HTTPS'})`,
+    brevo:   `✔ Brevo API (${process.env.BREVO_FROM || process.env.EMAIL_USER || '?'})`,
+    resend:  `✔ Resend API (${process.env.RESEND_FROM || process.env.EMAIL_USER || '?'})`,
     smtp:    `✔ Gmail SMTP (${process.env.EMAIL_USER})`,
-    console: '⚠ Console/dev — no real delivery (set RESEND_API_KEY for production)',
+    console: '⚠ Console/dev — no real delivery (set BREVO_API_KEY for production)',
   }[getDriver()] || '?';
   log.info(`Email        : ${emailDriverLabel}`);
   log.divider();
