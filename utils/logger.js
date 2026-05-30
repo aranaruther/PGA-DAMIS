@@ -331,18 +331,22 @@ const log = {
     const isDormAction  = /\/api\/admin\/dormitory\/(assign|unassign|billing)/i.test(req.path);
     const isAdminAction = /\/api\/admin\/(accounts|users|dormitory)\/.+\/(approve|reject|assign|pay|verify|ban|unban)/i.test(req.path) || isDormAction;
     const isStatic      = /\.(css|js|ico|png|webp|woff2?|map|svg|txt)$/.test(req.path);
-    const isHealthy304  = s === 304; // Not Modified — suppress unless debugging
+    const isHealthy304  = s === 304;
 
-    if      (s >= 500)                       log.error(line);
-    else if (s >= 400)                       log.warn(`${line} ${USE_EMOJI ? '🚫 FORBIDDEN' : '[CLIENT ERROR]'}`);
-    else if (ms > VERY_SLOW && !isFileRoute) log.warn(`${line} ${USE_EMOJI ? '🐌 VERY SLOW' : '[VERY SLOW]'} (>${ms}ms)`);
-    else if (ms > SLOW_MS   && !isFileRoute) log.warn(`${line} ${USE_EMOJI ? '⏱ SLOW' : '[SLOW]'} (>${ms}ms)`);
-    else if (ms > VERY_SLOW &&  isFileRoute) log.info(`${line} ${c.dim}(file upload — slow OK)${c.reset}`);
-    else if (isDormAction)                   log.dorm(line);
-    else if (isAdminAction)                  log.admin(line);
-    else if (isStatic && s < 400)            return; // suppress noisy static hits
-    else if (isHealthy304 && !IS_DEV)        return; // suppress 304s in production
-    else                                     log.info(line);
+    // High-frequency polling routes that are noisy at 304 — only log when they actually change (200)
+    const isPollingRoute = /\/api\/admin\/(maintenance\/stats|dormitory\/(rooms|billing)|utility\/bills|accounts\/pending|users\/[^/]+\/reputation)/.test(req.path);
+
+    if      (s >= 500)                           log.error(line);
+    else if (s >= 400)                           log.warn(`${line} ${USE_EMOJI ? '🚫 FORBIDDEN' : '[CLIENT ERROR]'}`);
+    else if (ms > VERY_SLOW && !isFileRoute)     log.warn(`${line} ${USE_EMOJI ? '🐌 VERY SLOW' : '[VERY SLOW]'} (>${ms}ms)`);
+    else if (ms > SLOW_MS   && !isFileRoute)     log.warn(`${line} ${USE_EMOJI ? '⏱ SLOW' : '[SLOW]'} (>${ms}ms)`);
+    else if (ms > VERY_SLOW &&  isFileRoute)     log.info(`${line} ${c.dim}(file upload — slow OK)${c.reset}`);
+    else if (isDormAction)                       log.dorm(line);
+    else if (isAdminAction)                      log.admin(line);
+    else if (isStatic && s < 400)                return; // suppress static hits
+    else if (isPollingRoute && isHealthy304)      return; // suppress repetitive polling 304s
+    else if (isHealthy304 && !IS_DEV)            return; // suppress other 304s in production
+    else                                         log.info(line);
   },
 
   // ── Performance timer ─────────────────────────────────────────────────────

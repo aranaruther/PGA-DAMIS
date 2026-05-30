@@ -8,9 +8,13 @@ const log = require('../utils/logger');
  *   converts to base64 data URL so the app still works without Cloudinary.
  */
 
-const multer     = require('multer');
-const cloudinary = require('cloudinary').v2;
-const { Readable } = require('stream');
+const multer        = require('multer');
+const cloudinary    = require('cloudinary').v2;
+const { Readable }  = require('stream');
+const os            = require('os');
+const fs            = require('fs');
+const path          = require('path');
+const { execFile }  = require('child_process');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -29,18 +33,24 @@ if (!hasCloudinary) {
 }
 
 const storage = multer.memoryStorage();
-// id_front (school ID) and certificate fields allow PDFs in addition to images
+// id_front (school ID) and certificate fields allow PDFs and Word docs in addition to images
 const CERT_FIELDS = new Set(['cert_residency', 'cert_low_income', 'cert_enrollment', 'id_front']);
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-const ALL_DOC_TYPES = [...IMAGE_TYPES, 'application/pdf'];
+const DOCX_TYPES  = [
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+  'application/msword',  // legacy .doc (rare but accepted)
+];
+const ALL_DOC_TYPES = [...IMAGE_TYPES, 'application/pdf', ...DOCX_TYPES];
 
 const fileFilter = (req, file, cb) => {
   const allowed = CERT_FIELDS.has(file.fieldname) ? ALL_DOC_TYPES : IMAGE_TYPES;
-  allowed.includes(file.mimetype)
-    ? cb(null, true)
-    : cb(new Error(CERT_FIELDS.has(file.fieldname)
-        ? 'Only JPG, PNG, GIF, WebP, or PDF allowed for certificates.'
-        : 'Only JPG, PNG, GIF, WebP allowed.'), false);
+  if (allowed.includes(file.mimetype)) return cb(null, true);
+  // Extra guard: some browsers send wrong MIME for docx — check extension as fallback
+  const ext = (file.originalname || '').toLowerCase();
+  if (CERT_FIELDS.has(file.fieldname) && (ext.endsWith('.docx') || ext.endsWith('.doc'))) return cb(null, true);
+  cb(new Error(CERT_FIELDS.has(file.fieldname)
+    ? 'Only JPG, PNG, WebP, PDF, or DOCX allowed for certificates.'
+    : 'Only JPG, PNG, GIF, WebP allowed.'), false);
 };
 const multerUpload = multer({ storage, fileFilter, limits: { fileSize: 15 * 1024 * 1024 } });
 
@@ -53,6 +63,43 @@ async function resizeImage(buffer, options = {}) {
                : p.resize(width, null, { fit: 'inside', withoutEnlargement: true });
     return await p.jpeg({ quality, progressive: true }).toBuffer();
   } catch { return buffer; }
+}
+
+/**
+ * Convert a DOCX buffer to a PDF buffer using LibreOffice.
+ *
+ * LibreOffice is spawned headlessly in a unique temp directory per call so
+ * concurrent conversions don't collide on the ~/.config/libreoffice lock.
+ * Temp files are always cleaned up in a finally block.
+ *
+ * @param  {Buffer} docxBuffer  - Raw DOCX file bytes
+ * @param  {string} filename    - Original filename (used only for logging)
+ * @returns {Promise<Buffer>}   - PDF bytes
+ */
+async function convertDocxToPdf(docxBuffer, filename = 'document.docx') {
+  const tmpDir  = fs.mkdtempSync(path.join(os.tmpdir(), 'damis-docx-'));
+  const inPath  = path.join(tmpDir, 'input.docx');
+  const outPath = path.join(tmpDir, 'input.pdf');
+  try {
+    fs.writeFileSync(inPath, docxBuffer);
+    await new Promise((resolve, reject) => {
+      execFile(
+        'libreoffice',
+        ['--headless', '--convert-to', 'pdf', '--outdir', tmpDir, inPath],
+        { timeout: 30_000 },
+        (err, _stdout, stderr) => {
+          if (err) return reject(new Error(`LibreOffice: ${stderr || err.message}`));
+          resolve();
+        }
+      );
+    });
+    if (!fs.existsSync(outPath)) throw new Error('LibreOffice produced no output PDF');
+    const pdfBuf = fs.readFileSync(outPath);
+    log.upload(`convertDocxToPdf: "${filename}" → PDF (${(pdfBuf.length / 1024).toFixed(0)} KB)`);
+    return pdfBuf;
+  } finally {
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (_) {}
+  }
 }
 
 function toCloudinary(buffer, folder, opts = {}) {
@@ -137,8 +184,6 @@ async function processIdDocument(req, res, next) {
 
         // cropSzPct is relative to natural width — convert to pixels
         const cropPx = Math.round(natW * cropSzPct / 100);
-        // cropYPct is relative to natural height (since the crop box is square in natural-image space
-        // but the percentage was stored relative to each axis separately)
         const left = Math.max(0, Math.min(natW - cropPx, Math.round(natW * cropXPct / 100)));
         const top  = Math.max(0, Math.min(natH - cropPx, Math.round(natH * cropYPct / 100)));
         // Clamp so crop doesn't exceed image bounds
@@ -167,11 +212,17 @@ async function processIdDocument(req, res, next) {
 
     // ── ID docs and certs ────────────────────────────────────────────────
     const fields = ['id_front', 'id_back', 'selfie', 'cert_residency', 'cert_low_income', 'cert_enrollment'];
+    const DOCX_MIMES = new Set([
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/msword',
+    ]);
     for (const field of fields) {
       const file = req.files?.[field]?.[0] || (req.file?.fieldname === field ? req.file : null);
       if (!file) continue;
-      const isPdf = file.mimetype === 'application/pdf';
+      const isPdf  = file.mimetype === 'application/pdf';
+      const isDocx = DOCX_MIMES.has(file.mimetype) || (file.originalname || '').toLowerCase().endsWith('.docx');
       const folder = field.startsWith('cert_') ? 'damis/cert-docs' : 'damis/id-docs';
+
       if (isPdf) {
         // Upload PDFs as resource_type:'image' so Cloudinary generates accessible URLs
         // and allows thumbnail transformations (pg_1, etc.).
@@ -180,6 +231,35 @@ async function processIdDocument(req, res, next) {
           ? (await toCloudinary(file.buffer, folder, { resource_type: 'image', format: 'pdf' })).secure_url
           : toDataUrl(file.buffer, 'application/pdf');
         log.upload(`PDF upload [${field}] → resource_type:image | url: ${hasCloudinary ? (urls[field]||'').slice(0,70)+'…' : '[base64]'}`);
+
+      } else if (isDocx) {
+        // Convert DOCX → PDF at upload time via LibreOffice so the admin panel
+        // can preview documents inline (PDFs render in-browser; raw DOCX cannot).
+        // The original DOCX bytes are not stored — the PDF is the canonical record.
+        let pdfBuf;
+        try {
+          pdfBuf = await convertDocxToPdf(file.buffer, file.originalname);
+        } catch (convErr) {
+          // If LibreOffice fails, fall back to storing raw DOCX so the upload still
+          // succeeds; admin will see a Download button instead of an inline preview.
+          log.warn(`[upload] DOCX→PDF conversion failed for ${field} (${file.originalname}): ${convErr.message} — falling back to raw DOCX`);
+          urls[field] = hasCloudinary
+            ? (await toCloudinary(file.buffer, folder, {
+                resource_type: 'raw',
+                format: 'docx',
+                public_id: `${field}_${Date.now()}`,
+              })).secure_url
+            : toDataUrl(file.buffer, file.mimetype);
+          log.upload(`DOCX fallback [${field}] → resource_type:raw | url: ${hasCloudinary ? (urls[field]||'').slice(0,70)+'…' : '[base64]'}`);
+          continue;
+        }
+        // Upload the converted PDF as resource_type:'image' (same as native PDF uploads)
+        // so Cloudinary can generate thumbnail transformations for the admin preview.
+        urls[field] = hasCloudinary
+          ? (await toCloudinary(pdfBuf, folder, { resource_type: 'image', format: 'pdf' })).secure_url
+          : toDataUrl(pdfBuf, 'application/pdf');
+        log.upload(`DOCX→PDF upload [${field}] → resource_type:image | url: ${hasCloudinary ? (urls[field]||'').slice(0,70)+'…' : '[base64]'}`);
+
       } else {
         const buf = await resizeImage(file.buffer, { width: 1200, quality: 85 });
         urls[field] = hasCloudinary
@@ -214,4 +294,9 @@ module.exports = {
     { name: 'cert_low_income', maxCount: 1 },
     { name: 'cert_enrollment', maxCount: 1 },
   ]), processIdDocument],
+  // Low-level helpers exposed to route files for custom upload flows
+  multerUpload,
+  toCloudinary,
+  resizeImage,
+  hasCloudinary,
 };

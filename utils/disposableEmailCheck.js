@@ -127,8 +127,19 @@ function isDisposableEmail(email) {
 /**
  * Express middleware — rejects disposable emails with a clear 400 response.
  * Mount before any route that sends transactional email to a user-supplied address.
+ *
+ * DEV BYPASS: Disabled when NODE_ENV=development so temp-mail services (ozsaip.com,
+ * ruutukf.com, etc.) can be used freely during local testing. Re-enable in production
+ * by setting NODE_ENV=production (or any value other than 'development').
  */
 function rejectDisposableEmail(req, res, next) {
+  // ── Temporarily disabled in development for faster testing ──────────────────
+  // To re-enable: remove or change this condition, or set NODE_ENV=production.
+  if (process.env.NODE_ENV === 'development') {
+    return next();
+  }
+  // ────────────────────────────────────────────────────────────────────────────
+
   const email = (req.body?.email || '').trim();
   if (email && isDisposableEmail(email)) {
     return res.status(400).json({

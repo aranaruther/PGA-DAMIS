@@ -341,9 +341,9 @@
               </div>
             </div>
 
-            <!-- Sex at Birth -->
+            <!-- Sex -->
             <div class="mb-3">
-              <label class="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Sex at Birth <span class="text-red-400">*</span></label>
+              <label class="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Sex <span class="text-red-400">*</span></label>
               <div class="grid grid-cols-2 gap-3">
                 <label class="flex flex-col items-center gap-1 p-2.5 rounded-xl border-2 border-slate-100 cursor-pointer hover:border-blue-400 has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50 transition-all">
                   <input type="radio" name="sex" value="male" class="sr-only"/><i class="fa-solid fa-mars text-blue-400 text-base"></i><span class="text-xs font-semibold text-slate-600">Male</span></label>
@@ -458,32 +458,56 @@
               </div>
             </div>
 
-            <!-- Course + Year Level -->
-            <div class="grid grid-cols-2 gap-3">
+            <!-- Year Level → Course → Specialization (cascading) -->
+
+            <!-- Row 1: Year Level -->
+            <div class="grid grid-cols-2 gap-3 mb-3">
               <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1.5">Course <span class="text-red-400">*</span></label>
-                <select id="reg-course" class="form-input w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-100 appearance-none transition-colors">
-                  <option value="">&#8212; Select Course &#8212;</option>
-                  <option>College of Law</option>
-                  <option>School of Accountancy and Business Management</option>
-                  <option>School of Agricultural Sciences</option>
-                  <option>School of Arts and Sciences</option>
-                  <option>School of Education</option>
-                  <option>School of Engineering</option>
-                  <option>School of Fisheries and Ocean Sciences</option>
-                  <option>School of Forestry and Environmental Sciences</option>
-                  <option>School of Industrial Technology</option>
-                  <option>School of Information Technology</option>
-                </select>
+                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
+                  <i class="fa-solid fa-layer-group text-indigo-400 mr-1"></i>Year Level <span class="text-red-400">*</span>
+                </label>
+                <div class="relative">
+                  <select id="reg-yearlevel" onchange="onYearLevelChange()"
+                    class="form-input w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-100 appearance-none pr-8 transition-colors">
+                    <option value="">&#8212; Select Year Level &#8212;</option>
+                    <option value="1">1st Year</option>
+                    <option value="2">2nd Year</option>
+                    <option value="3">3rd Year</option>
+                    <option value="4">4th Year</option>
+                    <option value="5">5th Year</option>
+                  </select>
+                  <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs pointer-events-none"></i>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">Select your year level first to filter available courses.</p>
               </div>
               <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1.5">Year Level <span class="text-red-400">*</span></label>
-                <select id="reg-yearlevel" class="form-input w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-100 appearance-none transition-colors">
-                  <option value="">&#8212; Select &#8212;</option>
-                  <option>1st Year</option><option>2nd Year</option><option>3rd Year</option><option>4th Year</option><option>5th Year</option>
-                </select>
+                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
+                  <i class="fa-solid fa-book-open text-indigo-400 mr-1"></i>Program / Course <span class="text-red-400">*</span>
+                </label>
+                <div class="relative">
+                  <select id="reg-course" onchange="onCourseChange()" disabled
+                    class="form-input w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-100 appearance-none pr-8 disabled:opacity-50 transition-colors">
+                    <option value="">&#8212; Select Year Level first &#8212;</option>
+                  </select>
+                  <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs pointer-events-none"></i>
+                </div>
               </div>
             </div>
+
+            <!-- Row 2: Specialization / Major (shown only when course has one) -->
+            <div id="specialization-row" class="hidden mb-1">
+              <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
+                <i class="fa-solid fa-diagram-project text-purple-400 mr-1"></i>Major / Specialization <span class="text-red-400">*</span>
+              </label>
+              <div class="relative">
+                <select id="reg-specialization"
+                  class="form-input w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-100 appearance-none pr-8 transition-colors">
+                  <option value="">&#8212; Select Major / Specialization &#8212;</option>
+                </select>
+                <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs pointer-events-none"></i>
+              </div>
+            </div>
+
           </div>
 
           <!-- ─────────────────────────────────────── -->
@@ -502,7 +526,7 @@
                 <i class="fa-solid fa-person text-blue-400"></i> Father's Information</p>
               <div class="grid grid-cols-4 gap-2 mb-2">
                 <div>
-                  <label class="block text-xs font-semibold text-slate-600 mb-1">First Name</label>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">First Name <span class="text-red-400">*</span></label>
                   <input id="father-fname" type="text" placeholder="Juan" oninput="blockInvalidNameChars(this)"
                     class="form-input w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-700 placeholder:text-slate-300"/>
                 </div>
@@ -512,7 +536,7 @@
                     class="form-input w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-700 placeholder:text-slate-300"/>
                 </div>
                 <div>
-                  <label class="block text-xs font-semibold text-slate-600 mb-1">Last Name</label>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Last Name <span class="text-red-400">*</span></label>
                   <input id="father-lname" type="text" placeholder="Dela Cruz" oninput="blockInvalidNameChars(this)"
                     class="form-input w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-700 placeholder:text-slate-300"/>
                 </div>
@@ -525,16 +549,16 @@
               <!-- Father contact + employer -->
               <div class="grid grid-cols-2 gap-2 mb-2">
                 <div>
-                  <label class="block text-xs font-semibold text-slate-600 mb-1">Contact Number <span class="text-slate-400 font-normal">(opt.)</span></label>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Contact Number <span class="text-red-400">*</span></label>
                   <div class="flex rounded-xl overflow-hidden border border-slate-200 bg-white focus-within:border-blue-400 transition-all">
                     <span class="flex items-center px-2.5 bg-slate-100 border-r border-slate-200 text-xs font-semibold text-slate-600 select-none whitespace-nowrap">&#127477;&#127469; +63</span>
-                    <input id="father-phone" type="tel" placeholder="9171234567" maxlength="10" oninput="countParentPhone('father-phone','father-phone-count')"
+                    <input id="father-phone" type="tel" placeholder="9171234567" maxlength="10" oninput="countParentPhone('father-phone','father-phone-count','father-phone-err')"
                       class="flex-1 px-2.5 py-2 bg-transparent text-sm text-slate-700 placeholder:text-slate-300 outline-none"/>
                   </div>
-                  <div class="flex justify-between mt-1"><p class="text-xs text-slate-400">10 digits after +63</p><span id="father-phone-count" class="text-xs text-slate-400">0/10</span></div>
+                  <div class="flex justify-between mt-1"><p id="father-phone-err" class="text-xs text-red-400 hidden">Must start with 9</p><span id="father-phone-count" class="text-xs text-slate-400 ml-auto">0/10</span></div>
                 </div>
                 <div>
-                  <label class="block text-xs font-semibold text-slate-600 mb-1">Employer / Company <span class="text-slate-400 font-normal">(opt.)</span></label>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Employer / Company <span class="text-red-400">*</span></label>
                   <input id="father-employer" type="text" placeholder="e.g. PGA, ASCOT, Private"
                     class="form-input w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-700 placeholder:text-slate-300"/>
                 </div>
@@ -542,7 +566,7 @@
               <!-- Father address -->
               <div>
                 <div class="flex items-center justify-between mb-1.5">
-                  <label class="block text-xs font-semibold text-slate-600">Address <span class="text-slate-400 font-normal">(opt.)</span></label>
+                  <label class="block text-xs font-semibold text-slate-600">Address <span class="text-red-400">*</span></label>
                   <label class="flex items-center gap-1.5 cursor-pointer text-xs text-slate-500 font-semibold select-none">
                     <input type="checkbox" id="father-same-as-perm" onchange="toggleParentSameAsPerm('father')" class="w-3.5 h-3.5 accent-blue-600"/>
                     Same as Permanent
@@ -576,7 +600,7 @@
                 <i class="fa-solid fa-person-dress text-pink-400"></i> Mother's Information</p>
               <div class="grid grid-cols-4 gap-2 mb-2">
                 <div>
-                  <label class="block text-xs font-semibold text-slate-600 mb-1">First Name</label>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">First Name <span class="text-red-400">*</span></label>
                   <input id="mother-fname" type="text" placeholder="Maria" oninput="blockInvalidNameChars(this)"
                     class="form-input w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-700 placeholder:text-slate-300"/>
                 </div>
@@ -586,7 +610,7 @@
                     class="form-input w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-700 placeholder:text-slate-300"/>
                 </div>
                 <div>
-                  <label class="block text-xs font-semibold text-slate-600 mb-1">Last Name</label>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Last Name <span class="text-red-400">*</span></label>
                   <input id="mother-lname" type="text" placeholder="Dela Cruz" oninput="blockInvalidNameChars(this)"
                     class="form-input w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-700 placeholder:text-slate-300"/>
                 </div>
@@ -599,16 +623,16 @@
               <!-- Mother contact + employer -->
               <div class="grid grid-cols-2 gap-2 mb-2">
                 <div>
-                  <label class="block text-xs font-semibold text-slate-600 mb-1">Contact Number <span class="text-slate-400 font-normal">(opt.)</span></label>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Contact Number <span class="text-red-400">*</span></label>
                   <div class="flex rounded-xl overflow-hidden border border-slate-200 bg-white focus-within:border-blue-400 transition-all">
                     <span class="flex items-center px-2.5 bg-slate-100 border-r border-slate-200 text-xs font-semibold text-slate-600 select-none whitespace-nowrap">&#127477;&#127469; +63</span>
-                    <input id="mother-phone" type="tel" placeholder="9171234567" maxlength="10" oninput="countParentPhone('mother-phone','mother-phone-count')"
+                    <input id="mother-phone" type="tel" placeholder="9171234567" maxlength="10" oninput="countParentPhone('mother-phone','mother-phone-count','mother-phone-err')"
                       class="flex-1 px-2.5 py-2 bg-transparent text-sm text-slate-700 placeholder:text-slate-300 outline-none"/>
                   </div>
-                  <div class="flex justify-between mt-1"><p class="text-xs text-slate-400">10 digits after +63</p><span id="mother-phone-count" class="text-xs text-slate-400">0/10</span></div>
+                  <div class="flex justify-between mt-1"><p id="mother-phone-err" class="text-xs text-red-400 hidden">Must start with 9</p><span id="mother-phone-count" class="text-xs text-slate-400 ml-auto">0/10</span></div>
                 </div>
                 <div>
-                  <label class="block text-xs font-semibold text-slate-600 mb-1">Employer / Company <span class="text-slate-400 font-normal">(opt.)</span></label>
+                  <label class="block text-xs font-semibold text-slate-600 mb-1">Employer / Company <span class="text-red-400">*</span></label>
                   <input id="mother-employer" type="text" placeholder="e.g. PGA, ASCOT, Private"
                     class="form-input w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-slate-700 placeholder:text-slate-300"/>
                 </div>
@@ -616,7 +640,7 @@
               <!-- Mother address -->
               <div>
                 <div class="flex items-center justify-between mb-1.5">
-                  <label class="block text-xs font-semibold text-slate-600">Address <span class="text-slate-400 font-normal">(opt.)</span></label>
+                  <label class="block text-xs font-semibold text-slate-600">Address <span class="text-red-400">*</span></label>
                   <label class="flex items-center gap-1.5 cursor-pointer text-xs text-slate-500 font-semibold select-none">
                     <input type="checkbox" id="mother-same-as-perm" onchange="toggleParentSameAsPerm('mother')" class="w-3.5 h-3.5 accent-blue-600"/>
                     Same as Permanent
@@ -671,7 +695,43 @@
                 <!-- ── STEP 4: Profile Photo ── -->
         <div id="step-4" class="hidden px-8 pb-8 anim-slide-in">
           <h2 class="text-xl font-extrabold text-slate-800 dark:text-white mb-1">Profile Photo</h2>
-          <p class="text-slate-400 text-sm mb-6">Upload a clear face photo. Drag the white square to reposition and pull corners to resize your crop area. <span class="text-red-400 font-semibold">*</span> Required.</p>
+          <p class="text-slate-400 text-sm mb-4">Upload a clear face photo or take a live selfie. <span class="text-red-400 font-semibold">*</span> Required.</p>
+
+          <!-- Mode tabs: Upload Photo | Live Selfie -->
+          <div class="flex gap-2 mb-5">
+            <button id="btn-mode-upload" type="button" onclick="doModeUpload()"
+              class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-blue-600 text-white shadow shadow-blue-200 transition-all">
+              <i class="fa-solid fa-cloud-arrow-up"></i> Upload Photo
+            </button>
+            <button id="btn-mode-selfie" type="button" onclick="doModeSelfie()"
+              class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all">
+              <i class="fa-solid fa-camera"></i> Live Selfie
+            </button>
+          </div>
+
+          <!-- LIVE SELFIE PANEL -->
+          <div id="selfie-panel" class="hidden mb-5">
+            <div class="rounded-2xl overflow-hidden bg-slate-900 shadow-xl border border-slate-700 relative" style="max-width:420px;margin:0 auto;">
+              <video id="selfie-feed" autoplay playsinline muted
+                class="w-full block" style="max-height:320px;object-fit:cover;transform:scaleX(-1);">
+              </video>
+              <!-- Face guide overlay -->
+              <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
+                <div style="width:160px;height:200px;border:2.5px solid rgba(255,255,255,0.55);border-radius:50% 50% 45% 45%;box-shadow:0 0 0 2000px rgba(0,0,0,0.32);"></div>
+              </div>
+              <div class="absolute top-3 left-0 right-0 text-center">
+                <span class="bg-black/50 text-white text-xs font-semibold px-3 py-1 rounded-full backdrop-blur-sm">Position your face inside the oval</span>
+              </div>
+            </div>
+            <canvas id="selfie-canvas" class="hidden"></canvas>
+            <div class="flex justify-center mt-3">
+              <button id="selfie-snap-btn" type="button" onclick="captureSelfie()"
+                class="flex items-center gap-2 px-6 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-lg shadow-blue-200 transition-all">
+                <i class="fa-solid fa-circle text-red-300 text-base"></i> Capture Selfie
+              </button>
+            </div>
+            <p class="text-center text-xs text-slate-400 mt-2">Your photo is processed locally — not stored until you submit.</p>
+          </div>
 
           <!-- Avatar display — interactive crop viewfinder -->
           <div class="flex flex-col items-center mb-6">
@@ -773,10 +833,12 @@
                 <p class="text-xs text-slate-400">JPG, PNG, WEBP, PDF, DOCX · max 10MB</p></div>
               <div id="doc-prev-school-id" class="hidden">
                 <div id="doc-thumb-school-id" class="w-full bg-slate-100"></div>
-                <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800">
-                  <span id="doc-fn-school-id" class="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate flex-1"></span>
-                  <span class="text-xs text-green-500 font-semibold">&#10003; Ready</span>
-                  <button type="button" onclick="clearDocFile(event,'school-id')" class="w-6 h-6 rounded-full bg-red-50 text-red-400 hover:bg-red-100 flex items-center justify-center text-xs flex-shrink-0"><i class="fa-solid fa-xmark"></i></button>
+                <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border-t border-slate-100">
+                  <i class="fa-solid fa-id-card text-blue-400 text-sm flex-shrink-0"></i>
+                  <span id="doc-fn-school-id" class="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate flex-1"></span>
+                  <span id="doc-sz-school-id" class="text-xs text-slate-400 font-medium whitespace-nowrap"></span>
+                  <span class="text-xs text-green-500 font-bold">&#10003; Ready</span>
+                  <button type="button" onclick="clearDocFile(event,'school-id')" class="w-6 h-6 rounded-full bg-red-50 text-red-400 hover:bg-red-100 flex items-center justify-center text-xs flex-shrink-0" title="Remove"><i class="fa-solid fa-xmark"></i></button>
                 </div>
               </div>
             </div>
@@ -795,10 +857,12 @@
                 <p class="text-xs text-slate-400">JPG, PNG, WEBP, PDF, DOCX · max 10MB</p></div>
               <div id="doc-prev-residency" class="hidden">
                 <div id="doc-thumb-residency" class="w-full bg-slate-100"></div>
-                <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800">
-                  <span id="doc-fn-residency" class="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate flex-1"></span>
-                  <span class="text-xs text-green-500 font-semibold">&#10003; Ready</span>
-                  <button type="button" onclick="clearDocFile(event,'residency')" class="w-6 h-6 rounded-full bg-red-50 text-red-400 hover:bg-red-100 flex items-center justify-center text-xs flex-shrink-0"><i class="fa-solid fa-xmark"></i></button>
+                <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border-t border-slate-100">
+                  <i class="fa-solid fa-house text-green-400 text-sm flex-shrink-0"></i>
+                  <span id="doc-fn-residency" class="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate flex-1"></span>
+                  <span id="doc-sz-residency" class="text-xs text-slate-400 font-medium whitespace-nowrap"></span>
+                  <span class="text-xs text-green-500 font-bold">&#10003; Ready</span>
+                  <button type="button" onclick="clearDocFile(event,'residency')" class="w-6 h-6 rounded-full bg-red-50 text-red-400 hover:bg-red-100 flex items-center justify-center text-xs flex-shrink-0" title="Remove"><i class="fa-solid fa-xmark"></i></button>
                 </div>
               </div>
             </div>
@@ -817,10 +881,12 @@
                 <p class="text-xs text-slate-400">JPG, PNG, WEBP, PDF, DOCX · max 10MB</p></div>
               <div id="doc-prev-low-income" class="hidden">
                 <div id="doc-thumb-low-income" class="w-full bg-slate-100"></div>
-                <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800">
-                  <span id="doc-fn-low-income" class="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate flex-1"></span>
-                  <span class="text-xs text-green-500 font-semibold">&#10003; Ready</span>
-                  <button type="button" onclick="clearDocFile(event,'low-income')" class="w-6 h-6 rounded-full bg-red-50 text-red-400 hover:bg-red-100 flex items-center justify-center text-xs flex-shrink-0"><i class="fa-solid fa-xmark"></i></button>
+                <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border-t border-slate-100">
+                  <i class="fa-solid fa-hand-holding-heart text-amber-400 text-sm flex-shrink-0"></i>
+                  <span id="doc-fn-low-income" class="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate flex-1"></span>
+                  <span id="doc-sz-low-income" class="text-xs text-slate-400 font-medium whitespace-nowrap"></span>
+                  <span class="text-xs text-green-500 font-bold">&#10003; Ready</span>
+                  <button type="button" onclick="clearDocFile(event,'low-income')" class="w-6 h-6 rounded-full bg-red-50 text-red-400 hover:bg-red-100 flex items-center justify-center text-xs flex-shrink-0" title="Remove"><i class="fa-solid fa-xmark"></i></button>
                 </div>
               </div>
             </div>
@@ -839,10 +905,12 @@
                 <p class="text-xs text-slate-400">JPG, PNG, WEBP, PDF, DOCX · max 10MB</p></div>
               <div id="doc-prev-enrollment" class="hidden">
                 <div id="doc-thumb-enrollment" class="w-full bg-slate-100"></div>
-                <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800">
-                  <span id="doc-fn-enrollment" class="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate flex-1"></span>
-                  <span class="text-xs text-green-500 font-semibold">&#10003; Ready</span>
-                  <button type="button" onclick="clearDocFile(event,'enrollment')" class="w-6 h-6 rounded-full bg-red-50 text-red-400 hover:bg-red-100 flex items-center justify-center text-xs flex-shrink-0"><i class="fa-solid fa-xmark"></i></button>
+                <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border-t border-slate-100">
+                  <i class="fa-solid fa-graduation-cap text-indigo-400 text-sm flex-shrink-0"></i>
+                  <span id="doc-fn-enrollment" class="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate flex-1"></span>
+                  <span id="doc-sz-enrollment" class="text-xs text-slate-400 font-medium whitespace-nowrap"></span>
+                  <span class="text-xs text-green-500 font-bold">&#10003; Ready</span>
+                  <button type="button" onclick="clearDocFile(event,'enrollment')" class="w-6 h-6 rounded-full bg-red-50 text-red-400 hover:bg-red-100 flex items-center justify-center text-xs flex-shrink-0" title="Remove"><i class="fa-solid fa-xmark"></i></button>
                 </div>
               </div>
             </div>
@@ -1137,35 +1205,44 @@ let _vfDragging = false, _vfResizing = false, _vfResizeHandle = '';
 let _vfDragStartX = 0, _vfDragStartY = 0, _vfDragStartCX = 0, _vfDragStartCY = 0;
 let _vfResizeStartX = 0, _vfResizeStartY = 0, _vfResizeStartCX = 0, _vfResizeStartCY = 0, _vfResizeStartSz = 0;
 
-function previewAvatarViewfinder(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  if (file.size > 10 * 1024 * 1024) { alert('File too large. Max 10MB.'); return; }
+function previewAvatarViewfinder(event, fromDataUrl) {
+  // fromDataUrl=true: event.target.result already contains the dataUrl (selfie path)
+  var file = event.target && event.target.files && event.target.files[0];
 
-  avatarFileRef = file;
-
-  const reader = new FileReader();
-  reader.onload = function(e) {
+  function _loadDataUrl(dataUrl) {
     const img = new Image();
     img.onload = function() {
       _vfNatImg = img;
       const fullImg = document.getElementById('av-prev-full');
-      fullImg.src = e.target.result;
-
+      fullImg.src = dataUrl;
       document.getElementById('av-placeholder-wrap').classList.add('hidden');
       const vfWrap = document.getElementById('av-viewfinder-wrap');
       vfWrap.classList.remove('hidden');
       vfWrap.classList.add('flex');
-
-      // Position frame after image renders
       fullImg.onload = null;
       requestAnimationFrame(function() {
-        requestAnimationFrame(function() {
-          _initCropFrame();
-        });
+        requestAnimationFrame(function() { _initCropFrame(); });
       });
     };
-    img.src = e.target.result;
+    img.src = dataUrl;
+  }
+
+  if (fromDataUrl && event.target && event.target.result) {
+    // Selfie path — dataUrl already available
+    capturedPhotoData = event.target.result;
+    avatarFileRef     = file || null;
+    _loadDataUrl(event.target.result);
+    return;
+  }
+
+  if (!file) return;
+  if (file.size > 10 * 1024 * 1024) { alert('File too large. Max 10MB.'); return; }
+  avatarFileRef = file;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    capturedPhotoData = e.target.result;
+    _loadDataUrl(e.target.result);
   };
   reader.readAsDataURL(file);
 }
@@ -1377,14 +1454,26 @@ function renderCropPreview() {}
 
 
 // Drag to pan crop
-// ── Parent phone counter ─────────────────────────────────────────
-function countParentPhone(inputId, countId) {
-  const el = document.getElementById(inputId);
+// ── Parent phone counter + starts-with-9 enforcement ─────────────────────────
+function countParentPhone(inputId, countId, errId) {
+  const el  = document.getElementById(inputId);
   const cnt = document.getElementById(countId);
+  const err = errId ? document.getElementById(errId) : null;
   if (!el || !cnt) return;
-  const digits = el.value.replace(/\D/g,'').slice(0,10);
+  // Strip non-digits, cap at 10
+  let digits = el.value.replace(/\D/g,'').slice(0,10);
   el.value = digits;
   cnt.textContent = digits.length + '/10';
+  // Inline error: first digit must be 9
+  if (err) {
+    if (digits.length > 0 && digits[0] !== '9') {
+      err.classList.remove('hidden');
+      el.closest('.flex') && el.closest('.flex').classList.add('border-red-400');
+    } else {
+      err.classList.add('hidden');
+      el.closest('.flex') && el.closest('.flex').classList.remove('border-red-400');
+    }
+  }
 }
 
 // ── Same-as-permanent toggle for present address ─────────────────

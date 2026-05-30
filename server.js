@@ -90,10 +90,16 @@ app.use('/api/auth/check-phone',           checkLimiter);
 app.use('/api/',                           apiLimiter);
 
 // ── Request logging (morgan) ──────────────────────────
+// Skip high-frequency polling endpoints that flood the terminal.
+// The custom request-logger below handles errors/mutations on these routes anyway.
+const MORGAN_SKIP_RE = /^\/api\/admin\/(maintenance\/stats|users\/[^/]+\/reputation)$/;
+const morganSkip = (req) =>
+  req.method === 'GET' && MORGAN_SKIP_RE.test(req.path);
+
 if (process.env.NODE_ENV !== 'production') {
-  app.use(morgan('dev'));   // coloured: GET /api/posts 200 12ms
+  app.use(morgan('dev', { skip: morganSkip }));
 } else {
-  app.use(morgan('combined')); // Apache-style for production logs
+  app.use(morgan('combined', { skip: morganSkip }));
 }
 
 // ── Body parsers ──────────────────────────────────────

@@ -130,15 +130,23 @@
           <i class="fa-solid fa-users opacity-50 text-lg group-hover:opacity-80 transition-opacity"></i>
         </div>
         <p id="dd-total-residents" class="text-3xl font-extrabold">—</p>
-        <p id="dd-residents-sub" class="text-xs opacity-70 mt-1">Assigned to rooms</p>
+        <p id="dd-residents-fraction" class="text-xs opacity-60 mt-0.5">— / — beds</p>
+        <p id="dd-residents-sub" class="text-xs opacity-70 mt-0.5">— slots available</p>
         <p class="text-[10px] opacity-50 mt-2 flex items-center gap-1"><i class="fa-solid fa-arrow-right"></i> Manage residents</p>
       </button>
       <!-- Room Occupancy -->
       <button onclick="showTab('dormitory')" class="text-left bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-5 hover:border-brand-300 hover:shadow-sm transition-all group">
         <div class="flex items-center justify-between mb-3"><p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Room Occupancy</p><i class="fa-solid fa-door-open text-brand-500 opacity-70 text-lg"></i></div>
         <p id="dd-occupancy-pct" class="text-3xl font-extrabold text-slate-800 dark:text-slate-100">—</p>
-        <div class="mt-2 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden"><div id="dd-occ-bar" class="h-full rounded-full bg-brand-500 transition-all" style="width:0%"></div></div>
-        <p id="dd-occupancy-sub" class="text-xs text-slate-400 mt-1">—</p>
+        <div class="mt-2 h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden flex">
+          <div id="dd-occ-bar"          class="h-full bg-brand-500 transition-all" style="width:0%"></div>
+          <div id="dd-occ-bar-unassign" class="h-full bg-red-400 transition-all"   style="width:0%" title="Unassigned residents"></div>
+        </div>
+        <div class="flex items-center gap-3 mt-1.5">
+          <span class="flex items-center gap-1 text-[10px] text-slate-400"><span class="w-2 h-2 rounded-full bg-brand-500 inline-block"></span>Occupied</span>
+          <span class="flex items-center gap-1 text-[10px] text-red-400" id="dd-occ-legend-unassign"><span class="w-2 h-2 rounded-full bg-red-400 inline-block"></span>Unassigned</span>
+        </div>
+        <p id="dd-occupancy-sub" class="text-xs text-slate-400 mt-0.5">—</p>
       </button>
       <!-- Pending Applications -->
       <button onclick="showTab('registrations')" class="text-left bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-5 hover:border-amber-300 hover:shadow-sm transition-all group">
@@ -213,7 +221,7 @@
     </div>
 
     <!-- ── Charts row ── -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
       <!-- Billing status chart (paid vs unpaid) -->
       <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-5">
         <div class="flex items-center justify-between mb-4">
@@ -226,6 +234,16 @@
       <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-5">
         <h3 class="font-display font-semibold text-slate-800 dark:text-slate-100 mb-4">Maintenance by Status</h3>
         <div style="height:180px;position:relative;"><canvas id="dd-maint-chart"></canvas></div>
+      </div>
+      <!-- Residents by Municipality -->
+      <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-5">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-display font-semibold text-slate-800 dark:text-slate-100">Residents by Municipality</h3>
+          <button onclick="showTab('users')" class="text-xs text-brand-600 hover:underline font-medium">View all</button>
+        </div>
+        <div id="dd-municipality-chart" class="space-y-2 mt-2">
+          <div class="text-xs text-slate-400 text-center py-4">Loading…</div>
+        </div>
       </div>
     </div>
 
@@ -380,9 +398,9 @@
   <!-- ═══ ID VERIFICATION ═══ -->
   <!-- ═══ USERS ═══ -->
   <div id="tab-users" class="tab-content">
-    <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
       <div><h1 class="font-display font-bold text-2xl text-slate-900 dark:text-slate-100">Resident Management</h1><p id="user-count-text" class="text-sm text-slate-400 mt-0.5"></p></div>
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 flex-wrap">
         <div class="flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 gap-2 shadow-sm">
           <i class="fa-solid fa-magnifying-glass text-slate-400 text-sm"></i>
           <input id="user-filter" type="text" placeholder="Search residents..." class="bg-transparent text-sm outline-none text-slate-800 dark:text-slate-200 placeholder-slate-400 w-44" oninput="filterUsers(this.value)"/>
@@ -392,6 +410,39 @@
         <button onclick="showDeletedUsers()" class="flex items-center gap-1.5 text-xs font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 px-3 py-2 rounded-xl border border-red-200 dark:border-red-800 transition-colors"><i class="fa-solid fa-box-archive mr-1"></i>Deleted Archive</button>
       </div>
     </div>
+
+    <!-- ── Summary KPI Cards ── -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+      <div class="bg-gradient-to-br from-brand-600 to-brand-700 rounded-2xl p-4 text-white">
+        <p class="text-[10px] font-semibold uppercase tracking-wider opacity-70">Residents</p>
+        <p id="um-total-residents" class="text-2xl font-extrabold mt-0.5">—</p>
+        <p id="um-residents-cap" class="text-xs opacity-60 mt-0.5">of — beds</p>
+        <p id="um-unassigned-pill" class="hidden text-[10px] bg-red-400/80 text-white px-1.5 py-0.5 rounded-full mt-1 inline-block font-bold">— unassigned</p>
+      </div>
+      <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-4">
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Admins</p>
+        <p id="um-total-admins" class="text-2xl font-extrabold text-purple-600 dark:text-purple-400 mt-0.5">—</p>
+        <p class="text-xs text-slate-400 mt-0.5">System accounts</p>
+      </div>
+      <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-4">
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Available Beds</p>
+        <p id="um-avail-beds" class="text-2xl font-extrabold text-green-600 dark:text-green-400 mt-0.5">—</p>
+        <p class="text-xs text-slate-400 mt-0.5">Open slots</p>
+      </div>
+      <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-4">
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Top Municipality</p>
+        <p id="um-top-municipality" class="text-sm font-extrabold text-slate-800 dark:text-slate-100 mt-0.5 truncate">—</p>
+        <div id="um-municipality-list" class="mt-1 space-y-0.5"></div>
+      </div>
+    </div>
+
+    <!-- ── Role filter pills ── -->
+    <div class="flex items-center gap-2 mb-4">
+      <button id="um-tab-all"      onclick="setUserRoleFilter('all')"     class="um-role-tab active text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors border-brand-500 bg-brand-50 dark:bg-brand-950/40 text-brand-700 dark:text-brand-300">All</button>
+      <button id="um-tab-user"     onclick="setUserRoleFilter('user')"    class="um-role-tab text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors border-slate-200 dark:border-slate-700 text-slate-500 hover:border-brand-300">Residents only</button>
+      <button id="um-tab-admin"    onclick="setUserRoleFilter('admin')"   class="um-role-tab text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors border-slate-200 dark:border-slate-700 text-slate-500 hover:border-purple-300">Admins only</button>
+      <span class="ml-auto text-xs text-slate-400" id="um-filter-count"></span>
+    </div>
     <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-visible">
       <div class="overflow-x-auto" style="overflow-y:visible">
         <table class="w-full text-sm" style="overflow:visible">
@@ -399,6 +450,7 @@
             <th class="px-4 py-3 font-semibold">Resident</th>
             <th class="px-4 py-3 font-semibold">Email</th>
             <th class="px-4 py-3 font-semibold">Year Level</th>
+            <th class="px-4 py-3 font-semibold">Role</th>
             <th class="px-4 py-3 font-semibold">Reputation</th>
             <th class="px-4 py-3 font-semibold">Reports</th>
             <th class="px-4 py-3 font-semibold">Joined</th>
@@ -459,9 +511,9 @@
         <p class="text-xs text-slate-400 mt-1">Across all rooms</p>
       </div>
       <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-4">
-        <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Occupied</p>
+        <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Residents</p>
         <p id="dorm-occupied-count" class="text-3xl font-extrabold text-brand-600">—</p>
-        <p class="text-xs text-slate-400 mt-1">Active residents</p>
+        <p id="dorm-occupied-sub" class="text-xs text-slate-400 mt-1">Approved residents</p>
       </div>
       <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-4">
         <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Available Beds</p>
@@ -590,6 +642,62 @@
         <button onclick="generateMonthlyBills()" class="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"><i class="fa-solid fa-file-invoice-dollar text-xs"></i>Generate Bills</button>
       </div>
     </div>
+    <!-- GCash QR / Payment Info Card -->
+    <div id="gcash-settings-card" class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-5 mb-6">
+      <div class="flex items-start justify-between gap-4 flex-wrap">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/40 flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-qrcode text-green-600 dark:text-green-400"></i>
+          </div>
+          <div>
+            <p class="text-sm font-bold text-slate-700 dark:text-slate-200">GCash Payment Info</p>
+            <p class="text-xs text-slate-400 mt-0.5">QR code &amp; number shown to residents in My Dormitory</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <label id="gcash-qr-upload-label" class="cursor-pointer flex items-center gap-1.5 text-xs font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 px-3 py-1.5 rounded-xl hover:bg-green-100 transition-colors">
+            <i class="fa-solid fa-upload text-xs"></i>
+            <span id="gcash-qr-upload-label-text">Upload QR Photo</span>
+            <input type="file" accept="image/*" class="hidden" id="gcash-qr-file-input" onchange="uploadGcashQr(this)"/>
+          </label>
+          <button onclick="openGcashNumberEdit()" class="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-xl hover:bg-slate-100 transition-colors">
+            <i class="fa-solid fa-pen text-xs"></i>Set Number
+          </button>
+        </div>
+      </div>
+      <!-- GCash preview row -->
+      <div id="gcash-preview-row" class="hidden mt-4 flex items-start gap-4">
+        <div id="gcash-qr-preview-wrap" class="hidden">
+          <button type="button"
+            id="gcash-qr-view-btn"
+            onclick="openLightbox(document.getElementById('gcash-qr-preview-img').src,'GCash QR Code')"
+            class="block cursor-zoom-in group relative" title="Click to enlarge">
+            <img id="gcash-qr-preview-img" src="" alt="GCash QR"
+              class="w-24 h-24 rounded-xl border border-green-200 object-contain bg-white group-hover:opacity-80 transition-opacity"/>
+            <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-xl">
+              <i class="fa-solid fa-magnifying-glass-plus text-white text-sm drop-shadow"></i>
+            </div>
+          </button>
+          <button onclick="removeGcashQr()" class="mt-1 text-[11px] text-red-400 hover:text-red-600 block text-center w-full">Remove QR</button>
+        </div>
+        <div id="gcash-number-preview-wrap" class="hidden flex-1">
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">GCash Number</p>
+          <p id="gcash-number-preview" class="text-sm font-bold text-green-700 dark:text-green-400"></p>
+        </div>
+      </div>
+      <!-- GCash number edit inline -->
+      <div id="gcash-number-edit" class="hidden mt-3">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-bold text-slate-400">+63</span>
+          <input type="tel" id="gcash-number-input" maxlength="10" placeholder="9171234567"
+            class="flex-1 max-w-[160px] text-sm border border-green-300 dark:border-green-700 rounded-xl px-3 py-1.5 outline-none focus:border-green-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
+            oninput="this.value=this.value.replace(/\D/g,'').slice(0,10)"/>
+          <button onclick="saveGcashNumber()" class="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-xl font-semibold transition-colors">Save</button>
+          <button onclick="cancelGcashNumberEdit()" class="text-xs text-slate-400 hover:text-slate-600 px-2">✕</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Billing summary -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
       <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-4">
@@ -640,12 +748,13 @@
             <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Amount</th>
             <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
             <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Date Paid</th>
+            <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">GCash Receipt</th>
             <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Resident Note</th>
             <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
           </tr>
         </thead>
         <tbody id="billing-tbody">
-          <tr><td colspan="7" class="px-4 py-8 text-center text-slate-400">Select a month to view billing records.</td></tr>
+          <tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">Select a month to view billing records.</td></tr>
         </tbody>
       </table>
     </div>
@@ -733,13 +842,14 @@
         <thead><tr class="border-b border-slate-100 dark:border-slate-800 text-xs text-slate-400 uppercase tracking-wider">
           <th class="px-4 py-3 text-left">Resident</th>
           <th class="px-4 py-3 text-left">Request</th>
+          <th class="px-4 py-3 text-left">Photo</th>
           <th class="px-4 py-3 text-left">Category</th>
           <th class="px-4 py-3 text-left">Priority</th>
           <th class="px-4 py-3 text-left">Status</th>
           <th class="px-4 py-3 text-left">Submitted</th>
           <th class="px-4 py-3 text-left">Actions</th>
         </tr></thead>
-        <tbody id="maint-tbody"><tr><td colspan="7" class="px-4 py-8 text-center text-slate-400">Loading…</td></tr></tbody>
+        <tbody id="maint-tbody"><tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">Loading…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -805,9 +915,10 @@
           <th class="px-4 py-3 text-left">Amount</th>
           <th class="px-4 py-3 text-left">Units Used</th>
           <th class="px-4 py-3 text-left">Note</th>
+          <th class="px-4 py-3 text-left">Bill Photo</th>
           <th class="px-4 py-3 text-left">Updated</th>
         </tr></thead>
-        <tbody id="utility-tbody"><tr><td colspan="6" class="px-4 py-8 text-center text-slate-400">Select a month to view utility bills.</td></tr></tbody>
+        <tbody id="utility-tbody"><tr><td colspan="7" class="px-4 py-8 text-center text-slate-400">Select a month to view utility bills.</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -846,6 +957,19 @@
         <div>
           <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Note (optional)</label>
           <textarea id="util-input-note" rows="2" class="w-full bg-slate-50 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-sm border border-transparent focus:border-brand-400 outline-none resize-none" placeholder="e.g. High usage due to summer heat"></textarea>
+        </div>
+        <!-- Bill photo upload -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Bill Photo <span class="font-normal text-slate-400">(optional)</span></label>
+          <label id="util-img-label" class="cursor-pointer flex items-center gap-2 text-sm text-slate-500 bg-slate-50 dark:bg-slate-800 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 hover:border-brand-400 hover:text-brand-600 transition-colors">
+            <i class="fa-solid fa-camera text-slate-400"></i>
+            <span id="util-img-label-text">Click to upload bill image</span>
+            <input type="file" accept="image/*" class="hidden" id="util-input-image" onchange="previewUtilImage(this)"/>
+          </label>
+          <div id="util-img-preview-wrap" class="hidden mt-2 relative w-fit">
+            <img id="util-img-preview" src="" alt="Bill preview" class="h-20 rounded-xl border border-slate-200 object-cover"/>
+            <button type="button" onclick="clearUtilImage()" class="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full text-[10px] flex items-center justify-center font-bold shadow transition-colors" title="Remove">✕</button>
+          </div>
         </div>
       </div>
       <div class="flex gap-3 mt-6">
@@ -997,26 +1121,45 @@
   <button class="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors z-10" onclick="closeLightbox()">
     <i class="fa-solid fa-xmark text-lg"></i>
   </button>
-  <!-- Zoom controls -->
-  <div class="absolute bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/50 backdrop-blur-sm rounded-full px-4 py-2 z-10" onclick="event.stopPropagation()">
-    <button onclick="lbZoom(-0.25)" class="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 text-white text-sm flex items-center justify-center transition-colors"><i class="fa-solid fa-minus text-xs"></i></button>
+  <!-- Zoom controls (images only) -->
+  <div class="absolute bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/60 backdrop-blur-sm rounded-full px-4 py-2 z-10" onclick="event.stopPropagation()">
+    <button onclick="lbZoom(-0.25)" class="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 text-white text-sm flex items-center justify-center transition-colors" title="Zoom out (−)"><i class="fa-solid fa-minus text-xs"></i></button>
     <span id="lb-zoom-pct" class="text-white/70 text-xs font-mono w-10 text-center">100%</span>
-    <button onclick="lbZoom(+0.25)" class="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 text-white text-sm flex items-center justify-center transition-colors"><i class="fa-solid fa-plus text-xs"></i></button>
-    <button onclick="lbReset()" class="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 text-white text-sm flex items-center justify-center transition-colors ml-1" title="Reset view"><i class="fa-solid fa-compress text-xs"></i></button>
+    <button onclick="lbZoom(+0.25)" class="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 text-white text-sm flex items-center justify-center transition-colors" title="Zoom in (+)"><i class="fa-solid fa-plus text-xs"></i></button>
+    <button onclick="lbReset()" class="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 text-white text-sm flex items-center justify-center transition-colors ml-1" title="Fit to screen (0)"><i class="fa-solid fa-compress text-xs"></i></button>
+    <button onclick="lbFitWidth()" class="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 text-white text-sm flex items-center justify-center transition-colors" title="Fit width (W)"><i class="fa-solid fa-left-right text-xs"></i></button>
     <a id="lightbox-open" href="#" target="_blank" class="ml-1 text-brand-400 text-xs hover:text-brand-300 flex items-center gap-1" onclick="event.stopPropagation()">
       <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
     </a>
   </div>
-  <div id="lb-viewport" class="overflow-hidden cursor-grab active:cursor-grabbing rounded-xl" style="width:min(92vw,900px);height:min(85vh,700px);display:flex;align-items:center;justify-content:center;" onclick="event.stopPropagation()">
-    <img id="lightbox-img" src="" draggable="false" class="select-none rounded-xl shadow-2xl" style="transform-origin:center center;transition:none;max-width:none;max-height:none;"/>
+  <!-- PDF page navigation (shown only when viewing PDFs) -->
+  <div id="lb-pdf-nav" class="hidden absolute bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/60 backdrop-blur-sm rounded-full px-5 py-2.5 z-10" onclick="event.stopPropagation()">
+    <button id="lb-pdf-prev" onclick="_pdfRenderPage(_pdfPage-1)" disabled
+      class="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 disabled:opacity-30 disabled:cursor-not-allowed text-white text-sm flex items-center justify-center transition-colors">
+      <i class="fa-solid fa-chevron-left text-xs"></i>
+    </button>
+    <span id="lb-pdf-counter" class="text-white/80 text-xs font-medium min-w-[56px] text-center">Page 1</span>
+    <button id="lb-pdf-next" onclick="_pdfRenderPage(_pdfPage+1)"
+      class="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 disabled:opacity-30 disabled:cursor-not-allowed text-white text-sm flex items-center justify-center transition-colors">
+      <i class="fa-solid fa-chevron-right text-xs"></i>
+    </button>
+    <span class="w-px h-4 bg-white/20 mx-1"></span>
+    <a id="lightbox-open-pdf" href="#" target="_blank" class="text-brand-400 text-xs hover:text-brand-300 flex items-center gap-1.5" onclick="event.stopPropagation()">
+      <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>Open PDF
+    </a>
+  </div>
+  <div id="lb-viewport" class="overflow-hidden cursor-grab active:cursor-grabbing rounded-xl" style="width:min(96vw,1400px);height:min(90vh,900px);display:flex;align-items:center;justify-content:center;" onclick="event.stopPropagation()">
+    <img id="lightbox-img" src="" draggable="false" class="select-none rounded-xl shadow-2xl transition-opacity duration-150" style="transform-origin:center center;transition:none;max-width:none;max-height:none;"/>
     <iframe id="lightbox-pdf" src="" class="hidden rounded-xl shadow-2xl" style="width:100%;height:100%;border:none;" title="PDF Preview"></iframe>
   </div>
   <p id="lightbox-label" class="absolute top-4 left-1/2 -translate-x-1/2 bg-black/50 backdrop-blur-sm text-white/80 text-sm font-medium px-4 py-1.5 rounded-full pointer-events-none whitespace-nowrap max-w-[80vw] truncate"></p>
+  <p class="absolute top-4 right-16 text-white/30 text-[10px] pointer-events-none select-none">scroll=zoom · drag=pan · ←→=page · 0=fit · W=width · Esc=close</p>
 </div>
 
 <script src="/js/api.js"></script>
 <script>
   let currentUser=null, allUsers=[], allPosts=[], statsChart=null, provChart=null;
+  let _lastStats = null; // cached latest /api/admin/stats response
   let confirmCallback=null, rejectCallback=null;
 
   // ── Utilities ─────────────────────────────────────
@@ -1032,6 +1175,83 @@
   function avatarUrl(f,l){return`https://ui-avatars.com/api/?name=${encodeURIComponent((f||'A')+' '+(l||''))}&background=0070e0&color=fff&size=80`;}
   function toggleDark(){const on=localStorage.getItem('ch-dark')==='true';localStorage.setItem('ch-dark',String(!on));document.documentElement.classList.toggle('dark',!on);}
   const PH_TZ = 'Asia/Manila';
+
+  // ── Course code → human-readable full name ────────────────────────────────
+  // Kept in sync with ASCOT_COURSES in auth.js.  Used to display full names
+  // in registration review, resident management, and rejected-applications views.
+  const COURSE_LABELS = {
+    // School of Information Technology
+    'BSIT-AP': 'Bachelor of Science in Information Technology (BSIT)',
+    'BSIT-DD': 'Bachelor of Science in Information Technology (BSIT)',
+    'ACT':     'Associate in Computer Technology',
+    // School of Education
+    'BSEd-Gen': 'Bachelor of Secondary Education (General)',
+    'BSEd-Eng': 'Bachelor of Secondary Education (English)',
+    'BSEd-Fil': 'Bachelor of Secondary Education (Filipino)',
+    'BSEd-Math':'Bachelor of Secondary Education (Mathematics)',
+    'BSEd-Sci': 'Bachelor of Secondary Education (Science)',
+    'BSEd-SS':  'Bachelor of Secondary Education (Social Studies)',
+    'BEEd':     'Bachelor of Elementary Education',
+    'BSNEd':    'Bachelor of Special Needs Education',
+    'BPED':     'Bachelor of Physical Education',
+    // School of Agriculture
+    'BSA':      'Bachelor of Science in Agriculture',
+    'BSAB':     'Bachelor of Science in Agribusiness',
+    'BSF':      'Bachelor of Science in Forestry',
+    'BSES':     'Bachelor of Science in Environmental Science',
+    'BSFT':     'Bachelor of Science in Food Technology',
+    'DipFT':    'Diploma in Food Technology',
+    // School of Engineering
+    'BSCE':     'Bachelor of Science in Civil Engineering',
+    'BSEE':     'Bachelor of Science in Electrical Engineering',
+    'BSME':     'Bachelor of Science in Mechanical Engineering',
+    'BSCpE':    'Bachelor of Science in Computer Engineering',
+    'BSAE':     'Bachelor of Science in Agricultural Engineering',
+    'BIT':      'Bachelor of Industrial Technology',
+    'DipIT':    'Diploma in Industrial Technology',
+    // School of Industrial Technology
+    'AssocAET': 'Associate in Automotive Engineering Technician',
+    'AssocCET': 'Associate in Civil Engineering Technician',
+    'AssocEET': 'Associate in Electrical Engineering Technician',
+    'AssocFT':  'Associate in Food Technology',
+    'CertAET':  'Certificate in Automotive Engineering Technician',
+    'CertCET':  'Certificate in Civil Engineering Technician',
+    'CertEET':  'Certificate in Electrical Engineering Technician',
+    'CertFT':   'Certificate in Food Technology',
+    // School of Accountancy and Business Management
+    'BSAcc':    'Bachelor of Science in Accountancy',
+    'BSHM':     'Bachelor of Science in Hospitality Management',
+    'BSTM':     'Bachelor of Science in Tourism Management',
+    // College of Law
+    'JD':       'Juris Doctor',
+    // Nursing / Health
+    'BSN':      'Bachelor of Science in Nursing',
+    'BSMed':    'Bachelor of Science in Medical Technology',
+    'BSPharma': 'Bachelor of Science in Pharmacy',
+  };
+
+  const SPECIALIZATION_LABELS = {
+    'BSIT-AP': 'Application Programming',
+    'BSIT-DD': 'Digital Design',
+  };
+
+  /**
+   * Returns the full human-readable course name for a stored code.
+   * Falls back to the raw code if not found (future-proofing).
+   */
+  function courseLabel(code) {
+    if (!code || code === '—') return code || '—';
+    return COURSE_LABELS[code] || code;
+  }
+
+  /**
+   * Returns the full specialization label for a course code.
+   * Returns null if the course has no known specialization.
+   */
+  function specializationLabel(code) {
+    if (!code || code === '—') return null;
+    return SPECIALIZATION_LABELS[code] || null;
+  }
   function normDate(d) {
     if (!d) return null;
     if (d instanceof Date) return d;
@@ -1089,7 +1309,7 @@
     else if(tab==='users')renderUsers(allUsers);
     else if(tab==='logs')loadLogs();
     else if(tab==='dormitory')loadDormRooms();
-    else if(tab==='billing'){ initBillingMonth(); loadBilling(); }
+    else if(tab==='billing'){ initBillingMonth(); loadBilling(); loadGcashSettings(); }
     else if(tab==='maintenance'){ loadMaintenanceStats(); loadMaintenance(); }
     else if(tab==='utility'){ initUtilityMonth(); loadUtility(); loadUtilityChart(); }
   }
@@ -1110,19 +1330,25 @@
   let _ddOccupancyChart=null, _ddMaintChart=null;
   async function loadDormDashboard() {
     try {
-      const [roomsRes, maintRes, pendingRes, billingRes] = await Promise.all([
+      const [roomsRes, maintRes, pendingRes, billingRes, statsRes] = await Promise.all([
         fetch('/api/admin/dormitory/rooms'),
         fetch('/api/admin/maintenance/stats'),
         fetch('/api/admin/accounts/pending'),
         fetch('/api/admin/dormitory/billing?month=' + dayjs().format('YYYY-MM')),
+        fetch('/api/admin/stats'),
       ]);
       const _roomsPayload = await roomsRes.json();
       // API returns { rooms: [...] } — normalise to plain array
       const rooms = Array.isArray(_roomsPayload) ? _roomsPayload : (_roomsPayload.rooms ?? []);
       console.log(`[DormDash] rooms loaded: ${rooms.length}`);
-      const maint   = await maintRes.json();
-      const pending = await pendingRes.json();
+      const maint          = await maintRes.json();
+      const _pendingPayload = await pendingRes.json();
+      // API returns { accounts: [...] }
+      const pendingAccounts = Array.isArray(_pendingPayload) ? _pendingPayload : (_pendingPayload.accounts ?? []);
       const billing = await billingRes.json();
+
+      // Cache stats — includes totalResidents/assignedResidents/unassignedResidents
+      if (statsRes.ok) { _lastStats = await statsRes.json(); }
 
       // Residents & occupancy
       // API returns r.occupied (SQL count) and r.assignments[] — NOT r.beds[].occupant
@@ -1137,17 +1363,33 @@
       const pct = totalBeds ? Math.round(occupiedBeds/totalBeds*100) : 0;
       const availBeds = totalBeds - occupiedBeds;
 
-      _set('dd-total-residents', occupiedBeds);
-      _set('dd-residents-sub', `${availBeds} bed${availBeds!==1?'s':''} available`);
+      // Use totalResidents from stats API (includes unassigned residents)
+      // Fall back to occupiedBeds if stats not yet loaded
+      const totalRes = (typeof _lastStats !== 'undefined' && _lastStats?.totalResidents != null)
+        ? _lastStats.totalResidents : occupiedBeds;
+      const unassigned = (typeof _lastStats !== 'undefined' && _lastStats?.unassignedResidents != null)
+        ? _lastStats.unassignedResidents : 0;
+      // ── Residents card: "28 / 104 · 82 slots available" ──────────────────
+      _set('dd-total-residents', totalRes);
+      _set('dd-residents-fraction', `${totalRes} / ${totalBeds} beds`);
+      _set('dd-residents-sub', `${availBeds} slot${availBeds!==1?'s':''} available`);
+
+      // ── Occupancy card: dual-bar (occupied=blue, unassigned=red) ──────────
       _set('dd-occupancy-pct', pct + '%');
-      _set('dd-occupancy-sub', `${occupiedBeds} / ${totalBeds} beds occupied`);
+      const unassignPct = totalBeds ? Math.round(unassigned / totalBeds * 100) : 0;
+      _set('dd-occupancy-sub', `${occupiedBeds} / ${totalBeds} beds occupied · ${unassigned} unassigned`);
       const bar = document.getElementById('dd-occ-bar');
       if(bar) bar.style.width = pct + '%';
+      const barU = document.getElementById('dd-occ-bar-unassign');
+      if(barU) barU.style.width = unassignPct + '%';
+      // Hide unassigned legend item when zero
+      const legendU = document.getElementById('dd-occ-legend-unassign');
+      if(legendU) legendU.style.display = unassigned > 0 ? '' : 'none';
       _set('dd-avail-beds', availBeds);
-      _set('dd-pending-apps', (pending||[]).length ?? 0);
+      _set('dd-pending-apps', pendingAccounts.length);
 
-      // Maintenance
-      const openMaint = (maint.pending||0) + (maint.in_progress||0);
+      // Maintenance — API returns { open, in_progress, resolved }
+      const openMaint = (maint.open||0) + (maint.in_progress||0);
       _set('dd-open-maint', openMaint);
 
       // Room Management tile
@@ -1209,15 +1451,15 @@
         console.log(`[DormDash] Utility — elec:${elec} water:${water}`);
       } catch(_) { _set('dd-util-elec','—'); _set('dd-util-water','—'); }
 
-      // Maintenance status chart
+      // Maintenance status chart — API fields: open, in_progress, resolved
       const mCtx = document.getElementById('dd-maint-chart')?.getContext('2d');
       if(mCtx){
         if(_ddMaintChart) _ddMaintChart.destroy();
         _ddMaintChart = new Chart(mCtx, {
           type:'bar',
-          data:{ labels:['Pending','In Progress','Resolved','Rejected'],
-            datasets:[{data:[maint.pending||0, maint.in_progress||0, maint.resolved||0, maint.rejected||0],
-              backgroundColor:['#fbbf24','#60a5fa','#34d399','#f87171'], borderRadius:6, borderWidth:0 }] },
+          data:{ labels:['Open','In Progress','Resolved'],
+            datasets:[{data:[maint.open||0, maint.in_progress||0, maint.resolved||0],
+              backgroundColor:['#fbbf24','#60a5fa','#34d399'], borderRadius:6, borderWidth:0 }] },
           options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} }, scales:{ y:{ beginAtZero:true, ticks:{stepSize:1} } } }
         });
       }
@@ -1225,9 +1467,9 @@
       // Recent applications
       const appsEl = document.getElementById('dd-recent-apps');
       if(appsEl){
-        if(!(pending||[]).length){ appsEl.innerHTML='<p class="text-xs text-slate-400 text-center py-3">No pending applications</p>'; }
+        if(!pendingAccounts.length){ appsEl.innerHTML='<p class="text-xs text-slate-400 text-center py-3">No pending applications</p>'; }
         else {
-          appsEl.innerHTML=(pending||[]).slice(0,5).map(a=>`
+          appsEl.innerHTML=pendingAccounts.slice(0,5).map(a=>`
             <div class="flex items-center gap-3 py-2 border-b border-slate-50 dark:border-slate-800 last:border-0">
               <img src="${escHtml(avatarUrl(a.firstName,a.lastName))}" class="w-8 h-8 rounded-full flex-shrink-0"/>
               <div class="flex-1 min-w-0">
@@ -1239,11 +1481,11 @@
         }
       }
 
-      // Recent open maintenance
+      // Recent open maintenance — use status=open (not 'pending' which is not a valid status value)
       const maintEl = document.getElementById('dd-recent-maint');
       if(maintEl){
         try {
-          const mr = await fetch('/api/admin/maintenance/requests?status=pending&limit=5');
+          const mr = await fetch('/api/admin/maintenance/requests?status=open&limit=5');
           const md = await mr.json();
           const items = (md.requests||md||[]).slice(0,5);
           if(!items.length){ maintEl.innerHTML='<p class="text-xs text-slate-400 text-center py-3">No open requests</p>'; }
@@ -1264,9 +1506,52 @@
       }
 
       console.info('[DormDash] Loaded dormitory dashboard');
+
+      // Municipality chart — use allUsers if already loaded, else fetch
+      renderDashMunicipalityChart(allUsers);
     } catch(e){
       console.error('[DormDash] Failed to load dashboard:', e);
     }
+  }
+
+  /** Render the municipality horizontal bar list in the dashboard chart panel.
+   *  Reuses allUsers if available; falls back to empty state gracefully. */
+  function renderDashMunicipalityChart(users) {
+    const el = document.getElementById('dd-municipality-chart');
+    if (!el) return;
+    const residents = (users || []).filter(u => u.role !== 'admin');
+    if (!residents.length) {
+      el.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">No resident data yet.</p>';
+      return;
+    }
+    // Parse municipality from permanentAddress
+    const muniMap = {};
+    residents.forEach(u => {
+      const addr = u.permanentAddress || u.presentAddress || '';
+      const parts = addr.split(',').map(s => s.trim()).filter(Boolean);
+      let muni = parts.length >= 2 ? parts[1] : (parts[0] || 'Unknown');
+      muni = muni.replace(/^City of\s+/i, '').replace(/^Municipality of\s+/i, '').trim() || 'Unknown';
+      muniMap[muni] = (muniMap[muni] || 0) + 1;
+    });
+    const sorted   = Object.entries(muniMap).sort((a, b) => b[1] - a[1]);
+    const maxCount = sorted[0]?.[1] || 1;
+    const total    = residents.length;
+    // Colour palette cycles through brand palette
+    const COLOURS  = ['#6366f1','#f59e0b','#10b981','#ef4444','#8b5cf6','#3b82f6','#ec4899'];
+    el.innerHTML = sorted.slice(0, 8).map(([muni, cnt], i) => {
+      const pct  = Math.round((cnt / maxCount) * 100);
+      const share= Math.round((cnt / total)    * 100);
+      const col  = COLOURS[i % COLOURS.length];
+      return `<div class="flex items-center gap-2">
+        <span class="text-[10px] text-slate-500 dark:text-slate-400 truncate w-[80px] flex-shrink-0">${escHtml(muni)}</span>
+        <div class="flex-1 h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+          <div class="h-full rounded-full transition-all" style="width:${pct}%;background:${col}"></div>
+        </div>
+        <span class="text-[10px] font-bold text-slate-600 dark:text-slate-300 w-5 text-right flex-shrink-0">${cnt}</span>
+        <span class="text-[10px] text-slate-400 w-7 text-right flex-shrink-0">${share}%</span>
+      </div>`;
+    }).join('');
+    console.log(`[DormDash] Municipality chart rendered: ${sorted.length} distinct municipalities`);
   }
 
   function _set(id, val){ const el=document.getElementById(id); if(el) el.textContent=val; }
@@ -1377,40 +1662,260 @@
   function lbReset(){
     _lbScale=1;_lbX=0;_lbY=0;_lbApply(true);
   }
+  /** Fit image to viewport width */
+  function lbFitWidth(){
+    const imgEl = document.getElementById('lightbox-img');
+    const vw    = document.getElementById('lb-viewport');
+    if(!imgEl || !vw) return;
+    const natW = imgEl.naturalWidth || parseFloat(imgEl.style.width) || 1;
+    const vpW  = vw.clientWidth * 0.97;
+    _lbScale   = vpW / natW;
+    _lbX = 0; _lbY = 0;
+    _lbApply(true);
+  }
 
   function _isPdfUrl(src){ return /\.pdf($|\?|#)/i.test(src) || /\/raw\/upload\//i.test(src); }
 
+  // Generate a Cloudinary page-image URL for PDFs stored as resource_type:image.
+  // page is 1-based.  Returns null for non-Cloudinary or raw-upload PDFs.
+  function _pdfPageUrl(url, page) {
+    if (!url) return null;
+    const m = url.match(/^(https?:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(v\d+\/.+\.pdf)$/i);
+    if (!m) return null;
+    const pg = page > 1 ? `pg_${page},` : 'pg_1,';
+    return m[1] + pg + 'f_jpg,q_85,w_1200/' + m[2];
+  }
+
   // Generate a Cloudinary image-thumbnail URL for PDFs uploaded as resource_type:image.
-  // Inserts pg_1,w_300,f_jpg transformation after /image/upload/ so Cloudinary
-  // renders page 1 as a JPEG thumbnail.  Returns null for raw/upload or non-Cloudinary PDFs.
   function _pdfThumbUrl(url) {
     if (!url) return null;
-    // Only works for Cloudinary image-type PDFs (not raw/upload)
     const m = url.match(/^(https?:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(v\d+\/.+\.pdf)$/i);
     if (!m) return null;
     return m[1] + 'pg_1,w_300,f_jpg/' + m[2];
   }
 
-  function openLightbox(src, label=''){
-    // PDFs: open in new tab directly (iframe CORS blocks Cloudinary raw files)
-    if(_isPdfUrl(src)){ window.open(src, '_blank', 'noopener'); return; }
+  // ── PDF viewer state (Cloudinary image-based, no iframe needed) ──────────
+  let _pdfSrc = '';          // original PDF URL
+  let _pdfPage = 1;          // current page (1-based)
+  let _pdfPageCount = null;  // null = unknown; probed on first open
 
-    const img=document.getElementById('lightbox-img');
-    const pdfFrame=document.getElementById('lightbox-pdf');
-    const lbl=document.getElementById('lightbox-label');
-    const lb=document.getElementById('img-lightbox');
-    const openLink=document.getElementById('lightbox-open');
-    if(!img||!lb)return;
-    if(lbl)lbl.textContent=label;
+  /** Binary-search Cloudinary to find total pages. Fires silently in background. */
+  function _probePdfPageCount(src) {
+    _pdfPageCount = null;
+    const counter = document.getElementById('lb-pdf-counter');
+    if(counter) counter.textContent = `Page ${_pdfPage}`;
+    // Binary search: try page 10, 5, 3, 2... to bound the max, then narrow
+    let lo = 1, hi = 64;
+    function probe(pg) {
+      const url = _pdfPageUrl(src, pg);
+      if(!url) return;
+      const img = new Image();
+      img.onload = () => {
+        // This page exists
+        if(pg === hi) {
+          // Try doubling
+          hi *= 2;
+          probe(hi);
+        } else {
+          lo = pg;
+          const mid = Math.floor((lo + hi) / 2);
+          if(mid === lo) {
+            _pdfPageCount = lo;
+            const c = document.getElementById('lb-pdf-counter');
+            if(c) c.textContent = `Page ${_pdfPage} of ${_pdfPageCount}`;
+            const btnNext = document.getElementById('lb-pdf-next');
+            if(btnNext) btnNext.disabled = _pdfPage >= _pdfPageCount;
+          } else {
+            probe(mid);
+          }
+        }
+      };
+      img.onerror = () => {
+        // This page doesn't exist
+        hi = pg - 1;
+        if(hi < lo) hi = lo;
+        const mid = Math.floor((lo + hi) / 2);
+        if(mid === lo) {
+          _pdfPageCount = lo;
+          const c = document.getElementById('lb-pdf-counter');
+          if(c) c.textContent = `Page ${_pdfPage} of ${_pdfPageCount}`;
+          const btnNext = document.getElementById('lb-pdf-next');
+          if(btnNext) btnNext.disabled = _pdfPage >= _pdfPageCount;
+        } else {
+          probe(mid);
+        }
+      };
+      img.src = url;
+    }
+    probe(2); // start by checking if page 2 exists
+  }
+
+  function _pdfRenderPage(page) {
+    const imgEl = document.getElementById('lightbox-img');
+    const lbEl  = document.getElementById('img-lightbox');
+    if (!imgEl || !lbEl) return;
+
+    const pageUrl = _pdfPageUrl(_pdfSrc, page);
+    if (!pageUrl) {
+      // Non-Cloudinary PDF — open in new tab as fallback
+      window.open(_pdfSrc, '_blank');
+      closeLightbox();
+      return;
+    }
+
+    _pdfPage = page;
+    imgEl.style.opacity = '0.3';
+
+    // Update page counter UI
+    const counter = document.getElementById('lb-pdf-counter');
+    if (counter) counter.textContent = _pdfPageCount
+      ? `Page ${page} of ${_pdfPageCount}`
+      : `Page ${page}`;
+
+    // Show/hide prev/next buttons
+    const btnPrev = document.getElementById('lb-pdf-prev');
+    const btnNext = document.getElementById('lb-pdf-next');
+    if (btnPrev) btnPrev.disabled = page <= 1;
+    // Disable next if we know total pages
+    if (btnNext) btnNext.disabled = _pdfPageCount ? page >= _pdfPageCount : false;
+
+    const newImg = new Image();
+    newImg.onload = () => {
+      imgEl.src = pageUrl;
+      imgEl.style.opacity = '1';
+      // Auto-size image to fit viewport
+      const vw = document.getElementById('lb-viewport');
+      if (vw) {
+        const maxW = vw.clientWidth * 0.96, maxH = vw.clientHeight * 0.96;
+        const r = Math.min(maxW / newImg.naturalWidth, maxH / newImg.naturalHeight, 1);
+        imgEl.style.width  = (newImg.naturalWidth  * r) + 'px';
+        imgEl.style.height = (newImg.naturalHeight * r) + 'px';
+      }
+      _lbScale = 1; _lbX = 0; _lbY = 0; _lbApply(false);
+
+      // If this page loaded successfully, try probing the next page to decide
+      // whether to disable the Next button (best-effort — fail silently).
+      if (btnNext && !btnNext.disabled) {
+        const probe = new Image();
+        probe.onerror = () => { if (btnNext) btnNext.disabled = true; };
+        probe.src = _pdfPageUrl(_pdfSrc, page + 1);
+      }
+    };
+    newImg.onerror = () => {
+      // This page doesn't exist — roll back and disable Next
+      if (page > 1) {
+        _pdfPage = page - 1;
+        if (counter) counter.textContent = `Page ${_pdfPage}`;
+      }
+      if (btnNext) btnNext.disabled = true;
+      imgEl.style.opacity = '1';
+    };
+    newImg.src = pageUrl;
+  }
+
+  function openLightbox(src, label=''){
+    const img    = document.getElementById('lightbox-img');
+    const pdfFrame = document.getElementById('lightbox-pdf');
+    const lbl    = document.getElementById('lightbox-label');
+    const lb     = document.getElementById('img-lightbox');
+    const openLink = document.getElementById('lightbox-open');
+    if(!lb) return;
+    if(lbl) lbl.textContent = label;
     lb.classList.remove('hidden');
-    document.body.style.overflow='hidden';
-    if(openLink)openLink.href=src;
-    // Image mode only
-    if(pdfFrame){ pdfFrame.classList.add('hidden'); pdfFrame.src=''; }
-    img.classList.remove('hidden');
-    const zoomBar=lb.querySelector('.absolute.bottom-5');
-    if(zoomBar)zoomBar.style.display='';
-    img.src=src;
+    document.body.style.overflow = 'hidden';
+    if(openLink){ openLink.href = src; openLink.style.display = ''; }
+    const openLinkPdf = document.getElementById('lightbox-open-pdf');
+    if(openLinkPdf) openLinkPdf.href = src;
+
+    // Hide legacy iframe (kept in DOM for safety)
+    if(pdfFrame){ pdfFrame.classList.add('hidden'); pdfFrame.src = ''; }
+
+    if(_isPdfUrl(src)){
+      // ── Cloudinary image-based PDF renderer ──────────────────────────────
+      // Converts each PDF page to a JPEG via Cloudinary transformations.
+      // Instant, reliable, no third-party viewer dependency.
+      _pdfSrc  = src;
+      _pdfPage = 1;
+
+      // Show image element, hide zoom bar (we show our own PDF nav instead)
+      if(img){ img.classList.remove('hidden'); img.src = ''; img.style.width = ''; img.style.height = ''; }
+      const zoomBar = lb.querySelector('.absolute.bottom-5');
+      if(zoomBar) zoomBar.style.display = 'none';
+
+      // Show PDF nav bar
+      const pdfNav = document.getElementById('lb-pdf-nav');
+      if(pdfNav) pdfNav.classList.remove('hidden');
+
+      const pageUrl = _pdfPageUrl(src, 1);
+      if(!pageUrl){
+        // Not a Cloudinary image-type PDF — open directly in new tab
+        window.open(src, '_blank');
+        closeLightbox();
+        return;
+      }
+      _pdfRenderPage(1);
+      // Probe total page count in background for "Page X of Y" display
+      _probePdfPageCount(src);
+
+      // ── Attach drag + scroll-zoom to PDF viewer (same as image mode) ──────
+      const vpPdf = document.getElementById('lb-viewport');
+      if(vpPdf){
+        // Scroll = zoom
+        vpPdf.onwheel=(e)=>{
+          e.preventDefault();
+          const delta = e.deltaY > 0 ? -0.15 : 0.15;
+          _lbScale = Math.max(0.2, Math.min(5, _lbScale + delta));
+          _lbApply(false);
+        };
+        // Drag to pan
+        vpPdf.onmousedown=(e)=>{
+          if(e.button!==0) return;
+          _lbDragging=true; _lbStartX=e.clientX-_lbX; _lbStartY=e.clientY-_lbY;
+          vpPdf.style.cursor='grabbing'; e.preventDefault();
+        };
+        vpPdf.onmousemove=(e)=>{
+          if(!_lbDragging) return;
+          _lbX=e.clientX-_lbStartX; _lbY=e.clientY-_lbStartY;
+          _lbApply(false);
+        };
+        const endPdfDrag=()=>{ _lbDragging=false; if(vpPdf) vpPdf.style.cursor='grab'; };
+        vpPdf.onmouseup=endPdfDrag; vpPdf.onmouseleave=endPdfDrag;
+        // Touch pinch-to-zoom
+        vpPdf.ontouchstart=(e)=>{
+          if(e.touches.length===2){
+            _lbPinchDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+          } else if(e.touches.length===1){
+            _lbDragging=true; _lbStartX=e.touches[0].clientX-_lbX; _lbStartY=e.touches[0].clientY-_lbY;
+          }
+        };
+        vpPdf.ontouchmove=(e)=>{
+          e.preventDefault();
+          if(e.touches.length===2 && _lbPinchDist>0){
+            const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+            _lbScale=Math.max(0.2,Math.min(5,_lbScale*(d/_lbPinchDist)));
+            _lbPinchDist=d; _lbApply(false);
+          } else if(_lbDragging && e.touches.length===1){
+            _lbX=e.touches[0].clientX-_lbStartX; _lbY=e.touches[0].clientY-_lbStartY;
+            _lbApply(false);
+          }
+        };
+        vpPdf.ontouchend=()=>{ _lbDragging=false; _lbPinchDist=0; };
+        // Also show the zoom bar for PDF (use same control bar)
+        const zoomBarPdf = document.getElementById('img-lightbox')?.querySelector('.absolute.bottom-5');
+        if(zoomBarPdf) zoomBarPdf.style.display = '';
+      }
+      return;
+    }
+
+    // ── Image mode ───────────────────────────────────────────────────────────
+    // Hide PDF nav
+    const pdfNav = document.getElementById('lb-pdf-nav');
+    if(pdfNav) pdfNav.classList.add('hidden');
+
+    if(img) img.classList.remove('hidden');
+    const zoomBar = lb.querySelector('.absolute.bottom-5');
+    if(zoomBar) zoomBar.style.display = '';
+    img.src = src;
     _lbScale=1;_lbX=0;_lbY=0;
     img.style.transform='';
     // Size the image to fit
@@ -1477,13 +1982,35 @@
     const pdfFrame=document.getElementById('lightbox-pdf');
     if(pdfFrame){ pdfFrame.classList.add('hidden'); pdfFrame.src=''; }
     const img=document.getElementById('lightbox-img');
-    if(img){ img.classList.remove('hidden'); }
+    if(img){ img.classList.remove('hidden'); img.src=''; }
+    const pdfNav=document.getElementById('lb-pdf-nav');
+    if(pdfNav) pdfNav.classList.add('hidden');
+    _pdfSrc=''; _pdfPage=1; _pdfPageCount=null;
     document.body.style.overflow='';
     _lbDragging=false;
     const vp=document.getElementById('lb-viewport');
     if(vp){vp.onmousedown=null;vp.onmousemove=null;vp.onmouseup=null;vp.onwheel=null;}
   }
-  document.addEventListener('keydown',(e)=>{if(e.key==='Escape')closeLightbox();});
+  document.addEventListener('keydown',(e)=>{
+    if(e.key==='Escape') closeLightbox();
+    const lb = document.getElementById('img-lightbox');
+    const isOpen = lb && !lb.classList.contains('hidden');
+    if(!isOpen) return;
+    // Arrow key PDF page navigation
+    if(_pdfSrc){
+      if(e.key==='ArrowRight' || e.key==='ArrowDown'){
+        const btn=document.getElementById('lb-pdf-next');
+        if(btn && !btn.disabled){ e.preventDefault(); _pdfRenderPage(_pdfPage+1); }
+      } else if(e.key==='ArrowLeft' || e.key==='ArrowUp'){
+        if(_pdfPage > 1){ e.preventDefault(); _pdfRenderPage(_pdfPage-1); }
+      }
+    }
+    // Zoom shortcuts (image & PDF)
+    if(e.key==='+' || e.key==='='){ e.preventDefault(); lbZoom(0.25); }
+    if(e.key==='-'){ e.preventDefault(); lbZoom(-0.25); }
+    if(e.key==='0'){ e.preventDefault(); lbReset(); }
+    if(e.key==='w'||e.key==='W'){ e.preventDefault(); lbFitWidth(); }
+  });
 
   // Lightweight user-list refresh — updates allUsers + Users tab without refetching stats/posts.
   // Called after account-approved socket event so the bed-assign modal sees new students immediately.
@@ -1498,6 +2025,7 @@
 
   async function refreshAll(){
     loadAiStatus();
+    loadMaintenanceStats(); // sync maint-badge on every refresh — not just the 60s poll
     try{
       console.log('%c refreshAll: fetching…', 'color:#64748b;font-size:11px');
       const t0 = Date.now();
@@ -1512,16 +2040,27 @@
       // Enrich users with reputation scores and report counts
       const reportCounts = rc.counts || {};
       allUsers = (ur.users||[]).map(u => ({ ...u, reportCount: reportCounts[u.id] || 0 }));
-      // Fetch reputation for each user in parallel (batch)
-      const repResults = await Promise.all(
-        allUsers.map(u => fetch(`/api/admin/users/${u.id}/reputation`).then(r=>r.ok?r.json():{score:0}).catch(()=>({score:0})))
-      );
-      allUsers = allUsers.map((u, i) => ({ ...u, reputationScore: repResults[i]?.score ?? 0 }));
+      // Fetch ALL reputation scores in ONE batch call instead of N individual requests.
+      // This eliminates the log flood: 20 GET /reputation lines → 1 GET /reputation/batch
+      const userIds = allUsers.map(u => u.id);
+      let repScores = {};
+      if (userIds.length) {
+        try {
+          const rb = await fetch(`/api/admin/users/reputation/batch?ids=${userIds.join(',')}`);
+          if (rb.ok) repScores = (await rb.json()).scores || {};
+        } catch { /* non-fatal — leave scores at 0 */ }
+      }
+      allUsers = allUsers.map(u => ({ ...u, reputationScore: repScores[u.id] ?? 0 }));
 
       allPosts=pr.posts||[];
+      _lastStats = sr;  // cache for room mgmt and dashboard resident count
       renderStatCards(sr);renderCharts(sr);renderRecentUsers(allUsers.slice(0,5));
       renderUsers(allUsers);renderPostsTable(allPosts);
-      document.getElementById('user-count-text').textContent=`${allUsers.length} total users`;
+      renderUserStats(allUsers);  // populate Resident Management KPI cards
+      renderDashMunicipalityChart(allUsers);  // update dashboard municipality panel
+      const resCount = allUsers.filter(u=>u.role!=='admin').length;
+      const admCount = allUsers.filter(u=>u.role==='admin').length;
+      document.getElementById('user-count-text').textContent=`${resCount} resident${resCount!==1?'s':''} · ${admCount} admin${admCount!==1?'s':''}`;
       document.getElementById('all-posts-count').textContent=`${allPosts.length} posts`;
       // Update badges
       if(sr.pendingPosts>0){
@@ -1648,7 +2187,7 @@
             <p class="font-bold text-slate-800 dark:text-slate-100 text-sm">${fullName}</p>
             ${docBadge}
           </div>
-          <p class="text-xs text-slate-400 truncate mt-0.5">${escHtml(a.email)} &nbsp;·&nbsp; ${escHtml(a.course||'—')} &nbsp;·&nbsp; ${escHtml(a.year_level||'—')}</p>
+          <p class="text-xs text-slate-400 truncate mt-0.5">${escHtml(a.email)} &nbsp;·&nbsp; ${escHtml(courseLabel(a.course)||'—')} &nbsp;·&nbsp; ${escHtml(a.year_level||'—')}</p>
         </div>
         <span class="text-xs text-slate-400 flex-shrink-0 hidden sm:block">${reltime(a.created_at)}</span>
         <span class="badge badge-pending text-xs px-2 py-0.5 flex-shrink-0">Pending</span>
@@ -1784,11 +2323,19 @@
       const safeUrl   = escHtml(url);
       const safeTitle = escHtml(label + ' — ' + name);
       const isImage = /\.(jpg|jpeg|png|webp|gif)$/i.test(url);
-      const isPdf   = /\.pdf($|\?)/i.test(url) || /\/raw\/upload\//i.test(url);
+      const isPdf   = /\.pdf($|\?)/i.test(url) || (/\/upload\//i.test(url) && /\.pdf/i.test(url));
+      const isDocx  = /\.docx?($|\?)/i.test(url);
       const pdfThumb = isPdf ? _pdfThumbUrl(url) : null;
       const thumbHtml = isImage
         ? '<img src="' + safeUrl + '" alt="' + escHtml(label) + '" class="w-full aspect-[4/3] object-cover object-center rounded-lg" onerror="this.style.display=\'none\'"/>'
-        : pdfThumb
+        : isDocx
+          ? '<div class="w-full aspect-[4/3] flex flex-col items-center justify-center gap-2 bg-blue-50 dark:bg-blue-950/20 rounded-lg">'
+            + '<i class="fa-solid fa-file-word text-blue-500 text-3xl"></i>'
+            + '<span class="text-[10px] font-bold text-blue-600 px-2">Word Document</span>'
+            + '<a href="' + safeUrl + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" '
+            + 'class="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-lg font-bold mt-1"><i class="fa-solid fa-download mr-1"></i>Download</a>'
+            + '</div>'
+          : pdfThumb
           ? '<div class="w-full aspect-[4/3] relative overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-700">'
             + '<img src="' + escHtml(pdfThumb) + '" alt="PDF preview" class="w-full h-full object-cover object-top" onerror="this.parentElement.innerHTML=\'<div class=&quot;w-full h-full flex flex-col items-center justify-center gap-2&quot;><i class=&quot;fa-solid fa-file-pdf text-red-500 text-3xl&quot;></i><span class=&quot;text-xs font-bold text-red-500&quot;>PDF</span></div>\'"/>'
             + '<div class="absolute bottom-1 right-1 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">PDF</div>'
@@ -1921,7 +2468,7 @@
           <!-- Row 2: DOB / Sex / Civil Status -->
           <div class="grid grid-cols-3 gap-3 mb-4">
             ${field('Date of Birth',  fmtBirthday(a.birthday))}
-            ${field('Sex at Birth',   a.sex)}
+            ${field('Sex',            a.sex)}
             ${field('Civil Status',   a.civil_status)}
           </div>
           <!-- Row 3: Present + Permanent Address -->
@@ -1952,11 +2499,15 @@
             ${field('School Name',    a.school_name || 'Aurora State College of Technology (ASCOT)')}
             ${field('School Address', a.school_address || 'Zabali, Baler, Aurora')}
           </div>
-          <!-- Row 2: Course + Year Level -->
-          <div class="grid grid-cols-2 gap-3">
-            ${field('Course',       a.course)}
+          <!-- Row 2: Year Level + Course -->
+          <div class="grid grid-cols-2 gap-3 mb-3">
             ${field('Year Level',   a.year_level)}
+            ${field('Course',       courseLabel(a.course))}
           </div>
+          ${a.specialization ? `<!-- Row 3: Specialization -->
+          <div class="grid grid-cols-1 gap-3">
+            ${field('Major / Specialization', specializationLabel(a.specialization) || specializationLabel(a.course) || a.specialization)}
+          </div>` : ''}
         </div>
 
         <!-- FAMILY INFORMATION -->
@@ -2021,7 +2572,7 @@
     toast('Account approved! User has been emailed. ✅','success');
     updateRegBadge(-1);
     // Also refresh stats
-    fetch('/api/admin/stats').then(r=>r.json()).then(s=>renderStatCards(s));
+    fetch('/api/admin/stats').then(r=>r.json()).then(s=>{ _lastStats=s; renderStatCards(s); });
   }
 
   async function confirmRejectAccount(id){
@@ -2032,7 +2583,7 @@
     document.getElementById(`reg-card-${id}`)?.remove();
     toast('Account rejected. User has been notified.','info');
     updateRegBadge(-1);
-    fetch('/api/admin/stats').then(r=>r.json()).then(s=>renderStatCards(s));
+    fetch('/api/admin/stats').then(r=>r.json()).then(s=>{ _lastStats=s; renderStatCards(s); });
   }
 
   let regBadgeCount = 0;
@@ -2233,15 +2784,104 @@
   // ── ID VERIFICATION ───────────────────────────────
 
   // ── USERS TABLE ───────────────────────────────────
+  let _userRoleFilter = 'all'; // 'all' | 'user' | 'admin'
+
+  function setUserRoleFilter(role) {
+    _userRoleFilter = role;
+    // Update pill styles
+    document.querySelectorAll('.um-role-tab').forEach(btn => {
+      const isActive = btn.id === `um-tab-${role}`;
+      btn.classList.toggle('active', isActive);
+      btn.classList.toggle('border-brand-500', isActive && role !== 'admin');
+      btn.classList.toggle('bg-brand-50', isActive && role !== 'admin');
+      btn.classList.toggle('dark:bg-brand-950/40', isActive && role !== 'admin');
+      btn.classList.toggle('text-brand-700', isActive && role !== 'admin');
+      btn.classList.toggle('border-purple-500', isActive && role === 'admin');
+      btn.classList.toggle('bg-purple-50', isActive && role === 'admin');
+      btn.classList.toggle('text-purple-700', isActive && role === 'admin');
+      btn.classList.toggle('border-slate-200', !isActive);
+      btn.classList.toggle('dark:border-slate-700', !isActive);
+      btn.classList.toggle('text-slate-500', !isActive);
+    });
+    filterUsers(document.getElementById('user-filter')?.value || '');
+  }
+
+  /** Render top municipality chips in the KPI card */
+  function renderUserStats(users) {
+    const residents = users.filter(u => u.role !== 'admin');
+    const admins    = users.filter(u => u.role === 'admin');
+    const stats     = _lastStats || {};
+    const totalBeds = stats.totalBeds ?? 104;
+    const unassigned = stats.unassignedResidents ?? 0;
+    const availBeds  = stats.availBeds ?? (totalBeds - residents.length);
+
+    const _s = (id, v) => { const el = document.getElementById(id); if(el) el.textContent = v; };
+    _s('um-total-residents', residents.length);
+    _s('um-residents-cap',   `of ${totalBeds} beds`);
+    _s('um-total-admins',    admins.length);
+    _s('um-avail-beds',      availBeds);
+
+    // Unassigned pill
+    const pill = document.getElementById('um-unassigned-pill');
+    if(pill) {
+      if(unassigned > 0) { pill.textContent = `${unassigned} unassigned`; pill.classList.remove('hidden'); }
+      else { pill.classList.add('hidden'); }
+    }
+
+    // Municipality breakdown — use permanentAddress (more authoritative than present).
+    // Philippine address format from PSGC: "Barangay, City/Municipality, Province, Region, Country"
+    // → index [1] is City/Municipality, which is what we want.
+    // Guard: if fewer parts, fall back progressively.
+    const muniMap = {};
+    residents.forEach(u => {
+      const addr = u.permanentAddress || u.presentAddress || u.permanent_address || u.present_address || '';
+      if (!addr) { muniMap['Unknown'] = (muniMap['Unknown'] || 0) + 1; return; }
+      const parts = addr.split(',').map(s => s.trim()).filter(Boolean);
+      // parts[1] = City/Municipality in standard PSGC address string
+      let muni = parts.length >= 2 ? parts[1] : parts[0];
+      // Normalise common prefixes so "City of Baler" and "Baler" merge
+      if (muni) muni = muni.replace(/^City of\s+/i, '').replace(/^Municipality of\s+/i, '').trim();
+      muniMap[muni || 'Unknown'] = (muniMap[muni || 'Unknown'] || 0) + 1;
+    });
+    const sorted = Object.entries(muniMap).sort((a,b) => b[1]-a[1]);
+    const topEl  = document.getElementById('um-top-municipality');
+    const listEl = document.getElementById('um-municipality-list');
+    if(topEl) topEl.textContent = sorted[0]?.[0] || '—';
+    const maxCount = sorted[0]?.[1] || 1;
+    if(listEl) {
+      listEl.innerHTML = sorted.slice(0, 5).map(([muni, cnt]) => {
+        const pct = Math.round((cnt / maxCount) * 100);
+        return `<div class="flex items-center gap-1.5 mt-1">
+          <span class="text-[10px] text-slate-500 dark:text-slate-400 truncate w-[90px] flex-shrink-0">${escHtml(muni)}</span>
+          <div class="flex-1 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+            <div class="h-full bg-brand-400 rounded-full" style="width:${pct}%"></div>
+          </div>
+          <span class="text-[10px] font-bold text-slate-600 dark:text-slate-300 w-4 text-right flex-shrink-0">${cnt}</span>
+        </div>`;
+      }).join('');
+    }
+  }
+
   function renderUsers(users){
     const tbody=document.getElementById('users-tbody');
     if(!tbody)return;
-    if(!users.length){tbody.innerHTML='<tr><td colspan="7" class="px-4 py-8 text-center text-slate-400">No residents found</td></tr>';return;}
+    // Update filter count label
+    const countEl = document.getElementById('um-filter-count');
+    if(countEl) countEl.textContent = users.length > 0 ? `${users.length} shown` : '';
+
+    if(!users.length){tbody.innerHTML='<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">No users found</td></tr>';return;}
     tbody.innerHTML=users.map(u=>{
       const av=escHtml(u.avatar||avatarUrl(u.firstName,u.lastName));
       const roleTag=u.role==='admin'?'<span class="badge badge-admin ml-1">Admin</span>':'';
       const activeTag=!u.isActive?'<span class="badge badge-rejected ml-1">Banned</span>':'';
       const rejectedTag=u.accountStatus==='rejected'?'<span class="badge badge-rejected ml-1">Rejected</span>':'';
+
+      // Role cell
+      const roleCellTxt = u.role === 'admin' ? 'Admin' : 'Resident';
+      const roleCellCls = u.role === 'admin'
+        ? 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40'
+        : 'text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-950/40';
+      const roleCell = `<span class="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full ${roleCellCls}">${roleCellTxt}</span>`;
 
       // Reputation display
       const score = u.reputationScore ?? 0;
@@ -2263,6 +2903,7 @@
         <td class="px-4 py-3"><div class="flex items-center gap-3"><img src="${av}" class="w-8 h-8 rounded-full object-cover flex-shrink-0" onerror="this.src='${avatarUrl(u.firstName,u.lastName)}'"/><div><p class="font-semibold text-sm text-slate-800 dark:text-slate-100">${escHtml(fullName(u))}${roleTag}${activeTag}${rejectedTag}</p><a href="/profile.html?u=${escHtml(u.username)}" target="_blank" class="text-xs text-brand-500 hover:underline">@${escHtml(u.username)}</a></div></div></td>
         <td class="px-4 py-3 text-xs text-slate-500 max-w-xs truncate">${escHtml(u.email)}</td>
         <td class="px-4 py-3">${yrCell}</td>
+        <td class="px-4 py-3">${roleCell}</td>
         <td class="px-4 py-3">${repCell}</td>
         <td class="px-4 py-3">${rptCell}</td>
         <td class="px-4 py-3 text-xs text-slate-400">${reltime(u.createdAt)}</td>
@@ -2275,7 +2916,7 @@
         </div></td>
       </tr>
       <tr id="user-review-row-${u.id}" class="hidden border-b-2 border-brand-100 dark:border-brand-900/40" style="overflow:visible">
-        <td colspan="7" class="p-0" style="overflow:visible">
+        <td colspan="8" class="p-0" style="overflow:visible">
           <div class="bg-slate-50 dark:bg-slate-800/50 border-l-4 border-brand-500 px-6 py-5 overflow-visible" id="user-review-panel-${u.id}">
             <div class="flex items-center justify-center py-6"><i class="fa-solid fa-spinner animate-spin text-xl text-slate-300"></i></div>
           </div>
@@ -2283,7 +2924,15 @@
       </tr>`;
     }).join('');
   }
-  function filterUsers(q){const f=allUsers.filter(u=>`${fullName(u)} ${u.username} ${u.email}`.toLowerCase().includes(q.toLowerCase()));renderUsers(f);}
+  function filterUsers(q){
+    let f = allUsers;
+    // Role filter
+    if(_userRoleFilter !== 'all') f = f.filter(u => u.role === _userRoleFilter);
+    // Search
+    if(q) f = f.filter(u=>`${fullName(u)} ${u.username} ${u.email}`.toLowerCase().includes(q.toLowerCase()));
+    renderUsers(f);
+  }
+  // filterUsers is defined above in the new block
   async function verifyUser(id){const r=await fetch(`/api/admin/users/${id}/verify`,{method:'PUT'});const d=await r.json();if(d.error){toast(d.error,'error');return;}toast('User verified!');refreshAll();}
   function banUser(id,name){showConfirm('Ban User',`Ban "${name}"? They won't be able to log in.`,async()=>{const r=await fetch(`/api/admin/users/${id}/ban`,{method:'PUT'});const d=await r.json();if(d.error){toast(d.error,'error');return;}toast('User banned.','info');refreshAll();});}
   async function unbanUser(id){const r=await fetch(`/api/admin/users/${id}/unban`,{method:'PUT'});const d=await r.json();if(d.error){toast(d.error,'error');return;}toast('User unbanned!');refreshAll();}
@@ -2362,7 +3011,9 @@
       document.getElementById(`user-row-${id}`)?.remove();
       document.getElementById(`user-review-row-${id}`)?.remove();
       allUsers=allUsers.filter(u=>u.id!==id);
-      document.getElementById('user-count-text').textContent=`${allUsers.length} total users`;
+      const _rc2=allUsers.filter(u=>u.role!=='admin').length, _ac2=allUsers.filter(u=>u.role==='admin').length;
+      document.getElementById('user-count-text').textContent=`${_rc2} resident${_rc2!==1?'s':''} · ${_ac2} admin${_ac2!==1?'s':''}`;
+      renderUserStats(allUsers);
       toast('User moved to Deleted Archive','info');
     });
   }
@@ -2392,7 +3043,6 @@
           <td class="px-4 py-2.5 text-xs text-slate-400">${reltime(u.deleted_at)}</td>
           <td class="px-4 py-2.5 flex gap-1">
             <button onclick="restoreDeletedUser('${u.id}','${escJS(fn)}')" class="text-xs font-semibold text-blue-600 hover:bg-blue-50 px-2 py-1 rounded-lg border border-blue-200 transition-colors"><i class="fa-solid fa-rotate-left mr-1"></i>Restore</button>
-            <button onclick="permanentlyDeleteArchived('${u.id}','${escJS(fn)}')" class="text-xs font-semibold text-red-500 hover:bg-red-50 px-2 py-1 rounded-lg border border-red-200 transition-colors"><i class="fa-solid fa-trash mr-1"></i>Purge</button>
           </td>
         </tr>`;
       }).join('');
@@ -2529,11 +3179,19 @@
       const safeUrl   = escHtml(url);
       const safeTitle = escHtml(label + ' — ' + name);
       const isImage = /\.(jpg|jpeg|png|webp|gif)$/i.test(url);
-      const isPdf   = /\.pdf($|\?)/i.test(url) || /\/raw\/upload\//i.test(url);
+      const isPdf   = /\.pdf($|\?)/i.test(url) || (/\/upload\//i.test(url) && /\.pdf/i.test(url));
+      const isDocx  = /\.docx?($|\?)/i.test(url);
       const pdfThumb = isPdf ? _pdfThumbUrl(url) : null;
       const thumbHtml = isImage
         ? '<img src="' + safeUrl + '" alt="' + escHtml(label) + '" class="w-full aspect-[4/3] object-cover object-center rounded-lg" onerror="this.style.display=\'none\'"/>'
-        : pdfThumb
+        : isDocx
+          ? '<div class="w-full aspect-[4/3] flex flex-col items-center justify-center gap-2 bg-blue-50 dark:bg-blue-950/20 rounded-lg">'
+            + '<i class="fa-solid fa-file-word text-blue-500 text-3xl"></i>'
+            + '<span class="text-[10px] font-bold text-blue-600 px-2">Word Document</span>'
+            + '<a href="' + safeUrl + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" '
+            + 'class="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-lg font-bold mt-1"><i class="fa-solid fa-download mr-1"></i>Download</a>'
+            + '</div>'
+          : pdfThumb
           ? '<div class="w-full aspect-[4/3] relative overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-700">'
             + '<img src="' + escHtml(pdfThumb) + '" alt="PDF preview" class="w-full h-full object-cover object-top" onerror="this.parentElement.innerHTML=\'<div class=&quot;w-full h-full flex flex-col items-center justify-center gap-2&quot;><i class=&quot;fa-solid fa-file-pdf text-red-500 text-3xl&quot;></i><span class=&quot;text-xs font-bold text-red-500&quot;>PDF</span></div>\'"/>'
             + '<div class="absolute bottom-1 right-1 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">PDF</div>'
@@ -2654,7 +3312,7 @@
           </div>
           <div class="grid grid-cols-3 gap-3 mb-4">
             ${field('Date of Birth', fmtBirthday(a.birthday))}
-            ${field('Sex at Birth',  a.sex)}
+            ${field('Sex',           a.sex)}
             ${field('Civil Status',  a.civil_status)}
           </div>
           <div class="grid grid-cols-2 gap-3 mb-4">
@@ -2680,10 +3338,13 @@
             ${field('School Name',    a.school_name || 'Aurora State College of Technology (ASCOT)')}
             ${field('School Address', a.school_address || 'Zabali, Baler, Aurora')}
           </div>
-          <div class="grid grid-cols-2 gap-3">
-            ${field('Course',     a.course)}
+          <div class="grid grid-cols-2 gap-3 mb-3">
             ${field('Year Level', a.year_level)}
+            ${field('Course',     courseLabel(a.course))}
           </div>
+          ${a.specialization ? `<div class="grid grid-cols-1 gap-3">
+            ${field('Major / Specialization', specializationLabel(a.specialization) || specializationLabel(a.course) || a.specialization)}
+          </div>` : ''}
         </div>
 
         <!-- FAMILY INFORMATION -->
@@ -2822,11 +3483,13 @@
       }
       const safeUrl=escHtml(url);
       const isImage=/\.(jpg|jpeg|png|webp|gif)$/i.test(url);
-      const isPdf=/\.pdf($|\?)/i.test(url)||/\/raw\/upload\//i.test(url);
+      const isPdf=/\.pdf($|\?)/i.test(url)||(/\/upload\//i.test(url)&&/\.pdf/i.test(url));
+      const isDocx=/\.docx?($|\?)/i.test(url);
       const pdfThumb3 = isPdf ? _pdfThumbUrl(url) : null;
       return '<div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-hidden cursor-pointer hover:border-blue-400 hover:shadow-md transition-all group"'
         +' data-lightbox-url="'+safeUrl+'" data-lightbox-title="'+escHtml(label+' — '+nameStr)+'">'
         +(isImage?'<img src="'+safeUrl+'" alt="'+escHtml(label)+'" class="w-full aspect-[4/3] object-cover object-center rounded-lg" onerror="this.style.display=\'none\'"/>'
+          :isDocx?'<div class="w-full aspect-[4/3] flex flex-col items-center justify-center gap-2 bg-blue-50 dark:bg-blue-950/20 rounded-lg"><i class="fa-solid fa-file-word text-blue-500 text-3xl"></i><span class="text-[10px] font-bold text-blue-600 px-2">Word Document</span><a href="'+safeUrl+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-lg font-bold mt-1"><i class="fa-solid fa-download mr-1"></i>Download</a></div>'
           :pdfThumb3?'<div class="w-full aspect-[4/3] relative overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-700"><img src="'+escHtml(pdfThumb3)+'" alt="PDF preview" class="w-full h-full object-cover object-top" onerror="this.parentElement.innerHTML=\'<div class=&quot;w-full h-full flex flex-col items-center justify-center gap-2&quot;><i class=&quot;fa-solid fa-file-pdf text-red-500 text-3xl&quot;></i><span class=&quot;text-xs font-bold text-red-500&quot;>PDF</span></div>\'"/><div class="absolute bottom-1 right-1 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">PDF</div></div>'
           :isPdf?'<div class="w-full aspect-[4/3] flex flex-col items-center justify-center gap-2 bg-amber-50 dark:bg-amber-950/20 rounded-lg"><i class="fa-solid fa-triangle-exclamation text-amber-500 text-2xl"></i><span class="text-xs font-bold text-amber-600 text-center px-2">PDF (re-upload<br>to preview)</span></div>'
           :'<div class="w-full aspect-[4/3] flex items-center justify-center bg-slate-50 dark:bg-slate-700 rounded-lg"><i class="fa-solid '+icon+' '+color+' text-3xl"></i></div>')
@@ -2925,7 +3588,7 @@
           </div>
           <div class="grid grid-cols-3 gap-3 mb-4">
             ${field('Date of Birth', fmtBirthday(u.birthday))}
-            ${field('Sex at Birth',  u.sex)}
+            ${field('Sex',           u.sex)}
             ${field('Civil Status',  u.civilStatus)}
           </div>
           <div class="grid grid-cols-2 gap-3 mb-4">
@@ -2951,10 +3614,13 @@
             ${field('School Name',    u.schoolName || 'Aurora State College of Technology (ASCOT)')}
             ${field('School Address', u.schoolAddress || 'Zabali, Baler, Aurora')}
           </div>
-          <div class="grid grid-cols-2 gap-3">
-            ${field('Course',     u.course)}
+          <div class="grid grid-cols-2 gap-3 mb-3">
             ${field('Year Level', u.yearLevel)}
+            ${field('Course',     courseLabel(u.course))}
           </div>
+          ${u.specialization ? `<div class="grid grid-cols-1 gap-3">
+            ${field('Major / Specialization', specializationLabel(u.specialization) || specializationLabel(u.course) || u.specialization)}
+          </div>` : ''}
         </div>
 
         <!-- FAMILY INFORMATION -->
@@ -3311,13 +3977,20 @@
       else maleCount++;
     });
     const avail = totalCap - occupied;
+    // Total residents = all approved non-admin users (incl. those not yet assigned a bed)
+    const totalApprovedResidents = _lastStats?.totalResidents ?? occupied;
+    const unassigned = totalApprovedResidents - occupied;
     const elOcc = document.getElementById('dorm-occupied-count');
+    const elOccSub = document.getElementById('dorm-occupied-sub');
     const elAvail = document.getElementById('dorm-avail-count');
     const elTotal = document.getElementById('dorm-total-rooms');
     const elCap = document.getElementById('dorm-total-capacity');
     const elSplit = document.getElementById('dorm-gender-split');
     const elSub = document.getElementById('dorm-subtitle');
-    if (elOcc) elOcc.textContent = occupied;
+    if (elOcc) elOcc.textContent = totalApprovedResidents;
+    if (elOccSub) elOccSub.textContent = unassigned > 0
+      ? `${occupied} assigned · ${unassigned} unassigned`
+      : `${occupied} assigned to beds`;
     if (elAvail) elAvail.textContent = avail;
     if (elTotal) elTotal.textContent = _dormRooms.length;
     if (elCap) elCap.textContent = totalCap;
@@ -3657,7 +4330,7 @@
     const month = inp?.value;
     const tbody = document.getElementById('billing-tbody');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center"><div class="inline-block w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin"></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center"><div class="inline-block w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin"></div></td></tr>';
     let bills = [];
     try {
       const r = await fetch(`/api/admin/dormitory/billing${month ? '?month='+month : ''}`);
@@ -3696,7 +4369,7 @@
     } catch {}
 
     if (!bills.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-400">No assigned residents this month. Assign students to rooms first.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">No assigned residents this month. Assign students to rooms first.</td></tr>';
       return;
     }
     tbody.innerHTML = bills.map(b => {
@@ -3735,6 +4408,20 @@
             <i class="fa-solid fa-comment-dots mr-1 text-amber-400"></i>${escHtml(b.user_comment.length > 40 ? b.user_comment.slice(0,40)+'…' : b.user_comment)}
            </span>`
         : '<span class="text-xs text-slate-300">—</span>';
+      const receiptHtml = b.receipt_url
+        ? `<div class="flex items-center gap-1.5">
+             <button type="button"
+               onclick="openLightbox('${escHtml(b.receipt_url)}','GCash Receipt — ${escHtml(fullName)}')"
+               title="View GCash receipt" class="cursor-zoom-in group relative">
+               <img src="${escHtml(b.receipt_url)}" alt="Receipt"
+                 class="h-10 w-14 rounded-lg object-cover border border-green-200 group-hover:opacity-80 transition-opacity"/>
+               <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/25 rounded-lg">
+                 <i class="fa-solid fa-magnifying-glass-plus text-white text-xs drop-shadow"></i>
+               </div>
+             </button>
+             <button class="clear-receipt-btn text-[10px] text-red-400 hover:text-red-600 transition-colors" data-bill-id="${b.id}" title="Remove receipt"><i class="fa-solid fa-trash-can"></i></button>
+           </div>`
+        : `<span class="text-xs text-slate-300 italic">Not uploaded</span>`;
       return `<tr class="border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50">
         <td class="px-4 py-3">
           <div class="flex items-center gap-2">
@@ -3749,6 +4436,7 @@
         <td class="px-4 py-3 text-sm font-semibold text-slate-800 dark:text-slate-100">₱${(b.amount||200).toFixed(2)}</td>
         <td class="px-4 py-3">${statusBadge}</td>
         <td class="px-4 py-3 text-xs text-slate-400">${b.paid_at ? reltime(b.paid_at) : '—'}</td>
+        <td class="px-4 py-3">${receiptHtml}</td>
         <td class="px-4 py-3 max-w-[180px]">${commentHtml}</td>
         <td class="px-4 py-3">${actionCell}</td>
       </tr>`;
@@ -3780,13 +4468,26 @@
 
   // Event delegation for billing table buttons — avoids apostrophe-in-name JS injection bugs
   document.getElementById('billing-tbody')?.addEventListener('click', async (e) => {
-    const payBtn    = e.target.closest('.paybill-btn');
-    const unPayBtn  = e.target.closest('.unbill-btn');
-    const remindBtn = e.target.closest('.remind-bill-btn');
-    if (payBtn)    { await markBillPaid(payBtn.dataset.billId); return; }
-    if (unPayBtn)  { await markBillUnpaid(unPayBtn.dataset.billId); return; }
-    if (remindBtn) { await sendPaymentReminder(remindBtn.dataset.billId, remindBtn.dataset.firstName, remindBtn.dataset.email); return; }
+    const payBtn      = e.target.closest('.paybill-btn');
+    const unPayBtn    = e.target.closest('.unbill-btn');
+    const remindBtn   = e.target.closest('.remind-bill-btn');
+    const clearRecBtn = e.target.closest('.clear-receipt-btn');
+    if (payBtn)      { await markBillPaid(payBtn.dataset.billId); return; }
+    if (unPayBtn)    { await markBillUnpaid(unPayBtn.dataset.billId); return; }
+    if (remindBtn)   { await sendPaymentReminder(remindBtn.dataset.billId, remindBtn.dataset.firstName, remindBtn.dataset.email); return; }
+    if (clearRecBtn) { await clearBillReceipt(clearRecBtn.dataset.billId); return; }
   });
+
+  async function clearBillReceipt(billId) {
+    if (!confirm('Remove the uploaded GCash receipt for this bill?')) return;
+    try {
+      const r = await fetch(`/api/admin/dormitory/billing/${billId}/receipt`, { method: 'DELETE' });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error);
+      toast('Receipt removed.', 'info');
+    } catch (e) { toast(e.message || 'Failed to remove receipt', 'error'); }
+    loadBilling();
+  }
 
   async function markBillPaid(billId) {
     try {
@@ -3850,6 +4551,123 @@
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-bell mr-1 text-xs"></i>Remind All'; }
       toast(e.message || 'Failed to send reminders', 'error');
     }
+  }
+
+  async function remindAllUnpaid() {
+    const month = document.getElementById('billing-month')?.value;
+    if (!month) { toast('Select a month first', 'error'); return; }
+    const btn = document.getElementById('remind-all-btn');
+    if (btn?.disabled) return;
+    if (!confirm(`Send payment reminders to ALL unpaid residents for ${month}? This will send email + in-app notification to each.`)) return;
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Sending…'; }
+    try {
+      const r = await fetch('/api/admin/dormitory/billing/remind-all', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ month })
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error);
+      toast(d.message || `Reminders sent!`, 'success');
+      if (btn) { btn.innerHTML = '<i class="fa-solid fa-circle-check mr-1"></i>Done'; }
+      setTimeout(() => { if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-bell mr-1 text-xs"></i>Remind All'; } }, 10000);
+    } catch (e) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-bell mr-1 text-xs"></i>Remind All'; }
+      toast(e.message || 'Failed to send reminders', 'error');
+    }
+  }
+
+  // ── GCash QR / Number management ─────────────────────────────────────────────
+  async function loadGcashSettings() {
+    try {
+      const r = await fetch('/api/admin/billing/gcash-qr');
+      if (!r.ok) return;
+      const d = await r.json();
+      _renderGcashPreview(d.url || '', d.number || '');
+    } catch (e) { console.warn('[GCash] loadGcashSettings:', e.message); }
+  }
+
+  function _renderGcashPreview(url, number) {
+    const previewRow  = document.getElementById('gcash-preview-row');
+    const qrWrap      = document.getElementById('gcash-qr-preview-wrap');
+    const qrImg       = document.getElementById('gcash-qr-preview-img');
+    const numWrap     = document.getElementById('gcash-number-preview-wrap');
+    const numText     = document.getElementById('gcash-number-preview');
+    const labelTxt    = document.getElementById('gcash-qr-upload-label-text');
+    const hasContent  = url || number;
+    if (previewRow) previewRow.classList.toggle('hidden', !hasContent);
+    if (url && qrWrap && qrImg) {
+      qrImg.src = url;
+      qrWrap.classList.remove('hidden');
+      if (labelTxt) labelTxt.textContent = 'Replace QR Photo';
+    } else if (qrWrap) {
+      qrWrap.classList.add('hidden');
+      if (labelTxt) labelTxt.textContent = 'Upload QR Photo';
+    }
+    if (number && numWrap && numText) {
+      numText.textContent = '+63 ' + number;
+      numWrap.classList.remove('hidden');
+    } else if (numWrap) {
+      numWrap.classList.add('hidden');
+    }
+  }
+
+  async function uploadGcashQr(input) {
+    const file = input.files?.[0];
+    if (!file) return;
+    const labelTxt = document.getElementById('gcash-qr-upload-label-text');
+    if (labelTxt) labelTxt.textContent = 'Uploading…';
+    try {
+      const fd = new FormData();
+      fd.append('qr', file);
+      const r = await fetch('/api/admin/billing/gcash-qr', { method: 'POST', body: fd });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Upload failed');
+      toast('GCash QR updated — residents can now see it.', 'success');
+      _renderGcashPreview(d.url, document.getElementById('gcash-number-preview')?.textContent?.replace('+63 ','') || '');
+    } catch (e) {
+      toast(e.message || 'Failed to upload QR', 'error');
+      if (labelTxt) labelTxt.textContent = 'Upload QR Photo';
+    }
+    input.value = ''; // reset file input
+  }
+
+  async function removeGcashQr() {
+    if (!confirm('Remove the GCash QR code? Residents will no longer see it.')) return;
+    try {
+      const r = await fetch('/api/admin/billing/gcash-qr', { method: 'DELETE' });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error);
+      toast('GCash QR removed.', 'info');
+      _renderGcashPreview('', document.getElementById('gcash-number-preview')?.textContent?.replace('+63 ','') || '');
+    } catch (e) { toast(e.message || 'Failed to remove QR', 'error'); }
+  }
+
+  function openGcashNumberEdit() {
+    const current = document.getElementById('gcash-number-preview')?.textContent?.replace('+63 ','') || '';
+    const inp = document.getElementById('gcash-number-input');
+    if (inp) inp.value = current;
+    document.getElementById('gcash-number-edit')?.classList.remove('hidden');
+    inp?.focus();
+  }
+  function cancelGcashNumberEdit() {
+    document.getElementById('gcash-number-edit')?.classList.add('hidden');
+  }
+  async function saveGcashNumber() {
+    const num = document.getElementById('gcash-number-input')?.value?.trim() || '';
+    if (num && (!/^9\d{9}$/.test(num))) {
+      toast('GCash number must be 10 digits starting with 9', 'error'); return;
+    }
+    try {
+      const r = await fetch('/api/admin/billing/gcash-number', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ number: num }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error);
+      toast(num ? 'GCash number saved.' : 'GCash number cleared.', 'success');
+      cancelGcashNumberEdit();
+      _renderGcashPreview(document.getElementById('gcash-qr-preview-img')?.src || '', num);
+    } catch (e) { toast(e.message || 'Failed to save number', 'error'); }
   }
 
   // ── Rate editing ────────────────────────────────────────
@@ -3922,13 +4740,13 @@
     const tbody = document.getElementById('maint-tbody');
     if (!tbody) return;
     const status = document.getElementById('maint-filter-status')?.value || 'all';
-    tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Loading…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Loading…</td></tr>';
     try {
       const r = await fetch(`/api/admin/maintenance/requests?status=${encodeURIComponent(status)}`);
       _maintRequests = await r.json();
       renderMaintenance(_maintRequests);
     } catch (e) {
-      tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-red-400">Failed to load. Try again.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-red-400">Failed to load. Try again.</td></tr>';
       console.error('loadMaintenance:', e);
     }
   }
@@ -3937,7 +4755,7 @@
     const tbody = document.getElementById('maint-tbody');
     if (!tbody) return;
     if (!requests.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-400">No maintenance requests found.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">No maintenance requests found.</td></tr>';
       return;
     }
     const CATEGORY_ICON = { plumbing:'fa-faucet', electrical:'fa-bolt', furniture:'fa-couch', door:'fa-door-open', window:'fa-window-maximize', appliance:'fa-plug', cleaning:'fa-broom', general:'fa-screwdriver-wrench' };
@@ -3947,7 +4765,18 @@
       const icon   = CATEGORY_ICON[req.category] || 'fa-screwdriver-wrench';
       const name   = escHtml(`${req.first_name} ${req.last_name}`);
       const room   = req.room_number ? `Room ${escHtml(String(req.room_number))}` : '—';
-      const ago    = dayjs(req.created_at).fromNow();
+      const ago    = reltime(req.created_at);
+      const imgCell = req.image_url
+        ? `<button type="button"
+             onclick="openLightbox('${escHtml(req.image_url)}','Issue Photo — ${name}')"
+             title="View issue photo" class="cursor-zoom-in group relative">
+             <img src="${escHtml(req.image_url)}" alt="Issue photo"
+               class="h-12 w-16 rounded-lg object-cover border border-slate-200 group-hover:opacity-80 transition-opacity"/>
+             <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/25 rounded-lg">
+               <i class="fa-solid fa-magnifying-glass-plus text-white text-sm drop-shadow"></i>
+             </div>
+           </button>`
+        : `<span class="text-xs text-slate-300">—</span>`;
       return `<tr class="border-b border-slate-50 dark:border-slate-800/60 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
         <td class="px-4 py-3">
           <div class="flex items-center gap-2">
@@ -3966,6 +4795,7 @@
           ${req.location ? `<p class="text-xs text-slate-400 mt-0.5"><i class="fa-solid fa-location-dot mr-1"></i>${escHtml(req.location)}</p>` : ''}
           ${req.admin_note ? `<p class="text-xs text-brand-600 mt-0.5 italic"><i class="fa-solid fa-note-sticky mr-1"></i>${escHtml(req.admin_note)}</p>` : ''}
         </td>
+        <td class="px-4 py-3">${imgCell}</td>
         <td class="px-4 py-3">
           <span class="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
             <i class="fa-solid ${icon} w-3"></i>${escHtml(req.category)}
@@ -4031,6 +4861,9 @@
   // ║  UTILITY BILLS — Admin JS                                   ║
   // ╚══════════════════════════════════════════════════════════════╝
   let _utilityBills = [];
+  // Keyed store (month+"|"+type) so onclick handlers can reference bills safely
+  // without embedding JSON in HTML attributes (breaks on Cloudinary URLs with & and ").
+  const _utilityBillMap = new Map();
 
   function initUtilityMonth() {
     const inp = document.getElementById('utility-month');
@@ -4044,13 +4877,17 @@
     const inp   = document.getElementById('utility-month');
     const month = inp?.value || '';
     const tbody = document.getElementById('utility-tbody');
-    if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Loading…</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Loading…</td></tr>';
     try {
-      const r = await fetch(`/api/admin/utility/bills${month ? '?month='+encodeURIComponent(month) : ''}`);
+      // _cb= cache-buster so the browser never serves a stale 304 after a bill mutation
+      const _cb = Date.now();
+      const r = await fetch(`/api/admin/utility/bills${month ? '?month='+encodeURIComponent(month)+'&_cb='+_cb : '?_cb='+_cb}`);
       _utilityBills = await r.json();
+      _utilityBillMap.clear();
+      _utilityBills.forEach(b => _utilityBillMap.set(b.month + '|' + b.type, b));
       renderUtilityBills(_utilityBills, month);
     } catch (e) {
-      if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-red-400">Failed to load.</td></tr>';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-red-400">Failed to load.</td></tr>';
       console.error('loadUtility:', e);
     }
   }
@@ -4072,7 +4909,7 @@
     const tbody = document.getElementById('utility-tbody');
     if (!tbody) return;
     if (!bills.length) {
-      tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-8 text-center text-slate-400">No utility bills found${month ? ' for '+month : ''}.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-8 text-center text-slate-400">No utility bills found${month ? ' for '+month : ''}.</td></tr>`;
       return;
     }
     tbody.innerHTML = bills.map(b => {
@@ -4081,7 +4918,25 @@
       const amt    = '₱'+Number(b.amount).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
       const units  = b.unit_used != null ? `${b.unit_used} ${isElec?'kWh':'m³'}` : '—';
       const updated= dayjs(b.updated_at).format('MMM D, YYYY');
-      return `<tr class="border-b border-slate-50 dark:border-slate-800/60 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+      const billImg = b.image_url
+        ? `<div class="flex items-center gap-1.5">
+             <button onclick="event.stopPropagation();openLightbox('${escHtml(b.image_url)}','${isElec?'Electricity':'Water'} Bill — ${escHtml(b.month)}')"
+               class="relative group" title="View bill image">
+               <img src="${escHtml(b.image_url)}" alt="Bill"
+                 class="h-10 w-14 rounded-lg object-cover border border-slate-200 group-hover:opacity-80 transition-opacity"/>
+               <span class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                 <i class="fa-solid fa-magnifying-glass-plus text-white drop-shadow text-xs"></i>
+               </span>
+             </button>
+             <button onclick="event.stopPropagation();removeUtilityBillImage('${escHtml(b.month)}|${escHtml(b.type)}')"
+               class="text-[10px] text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 px-1.5 py-0.5 rounded-lg border border-red-200 dark:border-red-800 transition-colors"
+               title="Remove image"><i class="fa-solid fa-xmark"></i></button>
+           </div>`
+        : `<span class="text-xs text-slate-300 dark:text-slate-600">—</span>`;
+      return `<tr class="border-b border-slate-50 dark:border-slate-800/60 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors cursor-pointer"
+        title="Click to edit"
+        onclick="openEditUtilityModal('${escHtml(b.month)}|${escHtml(b.type)}')"
+        data-util-month="${escHtml(b.month)}" data-util-type="${escHtml(b.type)}">
         <td class="px-4 py-3 text-sm font-semibold text-slate-700 dark:text-slate-200">${escHtml(b.month)}</td>
         <td class="px-4 py-3">
           <span class="flex items-center gap-1.5 text-sm font-medium text-slate-600 dark:text-slate-300">
@@ -4091,6 +4946,7 @@
         <td class="px-4 py-3 text-sm font-bold text-slate-800 dark:text-slate-100">${amt}</td>
         <td class="px-4 py-3 text-sm text-slate-500">${units}</td>
         <td class="px-4 py-3 text-sm text-slate-500 max-w-[200px] truncate">${escHtml(b.note||'—')}</td>
+        <td class="px-4 py-3" onclick="event.stopPropagation()">${billImg}</td>
         <td class="px-4 py-3 text-xs text-slate-400">${updated}</td>
       </tr>`;
     }).join('');
@@ -4104,11 +4960,84 @@
     document.getElementById('util-input-amount').value = '';
     document.getElementById('util-input-units').value  = '';
     document.getElementById('util-input-note').value   = '';
+    // Reset existing-image state
+    delete document.getElementById('utility-modal')._existingImageUrl;
+    clearUtilImage();
     document.getElementById('utility-modal').classList.remove('hidden');
   }
-  function closeUtilityModal() {
-    document.getElementById('utility-modal').classList.add('hidden');
+
+  /** Open the edit modal — accepts a "month|type" key from _utilityBillMap */
+  function openEditUtilityModal(key) {
+    const bill = _utilityBillMap.get(key);
+    if (!bill) { toast('Bill not found — please refresh', 'error'); return; }
+    initUtilityMonth();
+    document.getElementById('util-input-month').value  = bill.month || '';
+    document.getElementById('util-input-type').value   = bill.type  || 'electricity';
+    document.getElementById('util-input-amount').value = bill.amount != null ? bill.amount : '';
+    document.getElementById('util-input-units').value  = bill.unit_used != null ? bill.unit_used : '';
+    document.getElementById('util-input-note').value   = bill.note  || '';
+    clearUtilImage();
+    // Show existing image as a preview (read-only thumbnail with replace option)
+    const modal = document.getElementById('utility-modal');
+    modal._existingImageUrl = bill.image_url || '';
+    if (bill.image_url) {
+      const wrap = document.getElementById('util-img-preview-wrap');
+      const img  = document.getElementById('util-img-preview');
+      const lbl  = document.getElementById('util-img-label-text');
+      if (img)  img.src = bill.image_url;
+      if (wrap) wrap.classList.remove('hidden');
+      if (lbl)  lbl.textContent = 'Replace bill image';
+    }
+    modal.classList.remove('hidden');
   }
+  function closeUtilityModal() {
+    const modal = document.getElementById('utility-modal');
+    if (modal) { modal.classList.add('hidden'); delete modal._existingImageUrl; }
+  }
+
+  function previewUtilImage(input) {
+    const file = input.files?.[0];
+    if (!file) return;
+    const wrap = document.getElementById('util-img-preview-wrap');
+    const img  = document.getElementById('util-img-preview');
+    const lbl  = document.getElementById('util-img-label-text');
+    if (img)  img.src = URL.createObjectURL(file);
+    if (wrap) wrap.classList.remove('hidden');
+    if (lbl)  lbl.textContent = file.name.length > 22 ? file.name.slice(0,20)+'…' : file.name;
+  }
+  function clearUtilImage() {
+    const input = document.getElementById('util-input-image');
+    const wrap  = document.getElementById('util-img-preview-wrap');
+    const lbl   = document.getElementById('util-img-label-text');
+    if (input) input.value = '';
+    if (wrap)  wrap.classList.add('hidden');
+    if (lbl)   lbl.textContent = 'Click to upload bill image';
+  }
+
+  /** Remove the image from a utility bill — accepts a "month|type" key from _utilityBillMap */
+  async function removeUtilityBillImage(key) {
+    const bill = _utilityBillMap.get(key);
+    if (!bill) { toast('Bill not found — please refresh', 'error'); return; }
+    if (!confirm(`Remove the bill image for ${bill.type} — ${bill.month}?`)) return;
+    try {
+      const fd = new FormData();
+      fd.append('month',   bill.month);
+      fd.append('type',    bill.type);
+      fd.append('amount',  bill.amount);
+      fd.append('removeImage', '1');  // signal server to clear the image URL
+      if (bill.unit_used != null) fd.append('unitUsed', bill.unit_used);
+      if (bill.note)              fd.append('note',    bill.note);
+      const r = await fetch('/api/admin/utility/bills', { method: 'POST', body: fd });
+      const d = await r.json();
+      if (!d.success) throw new Error(d.error || 'Failed to remove image');
+      toast('Bill image removed', 'success');
+      loadUtility();
+    } catch (e) {
+      toast(e.message || 'Failed to remove image', 'error');
+      console.error('[admin] removeUtilityBillImage:', e);
+    }
+  }
+
   async function saveUtilityBill() {
     const btn   = document.getElementById('util-save-btn');
     const month = document.getElementById('util-input-month').value;
@@ -4116,14 +5045,18 @@
     const amt   = document.getElementById('util-input-amount').value;
     const units = document.getElementById('util-input-units').value;
     const note  = document.getElementById('util-input-note').value.trim();
+    const imgFile = document.getElementById('util-input-image')?.files?.[0];
     if (!month || !type || !amt) { toast('Month, type, and amount are required', 'error'); return; }
     btn.disabled = true; btn.textContent = 'Saving…';
     try {
-      const r = await fetch('/api/admin/utility/bills', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ month, type, amount: parseFloat(amt), unitUsed: units ? parseFloat(units) : null, note }),
-      });
+      const fd = new FormData();
+      fd.append('month', month);
+      fd.append('type', type);
+      fd.append('amount', parseFloat(amt));
+      if (units) fd.append('unitUsed', parseFloat(units));
+      if (note)  fd.append('note', note);
+      if (imgFile) fd.append('image', imgFile);
+      const r = await fetch('/api/admin/utility/bills', { method: 'POST', body: fd });
       const d = await r.json();
       if (!d.success) throw new Error(d.error || 'Save failed');
       closeUtilityModal();
@@ -4131,7 +5064,7 @@
       loadUtility();
     } catch (e) {
       toast(e.message || 'Failed to save', 'error');
-      console.error('saveUtilityBill:', e);
+      console.error('[admin] saveUtilityBill:', e);
     } finally {
       btn.disabled = false; btn.textContent = 'Save Bill';
     }

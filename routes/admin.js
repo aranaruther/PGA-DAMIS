@@ -20,6 +20,7 @@ const {
   createNotification,
   getDormRooms, assignBed, unassignBed,
   getDormBilling, generateMonthlyBills, generateBillForUser, markBillPaid, markBillUnpaid, waiveBill, setBillComment,
+  clearBillReceipt,
   getSetting, setSetting,
   getAllUserReports, updateReportStatus, getReportCountByUser,
   getReputationScore,
@@ -27,6 +28,7 @@ const {
   upsertUtilityBill, getUtilityBills, getUtilityTrend,
 } = require('../utils/db');
 const { sendAccountApprovedEmail, sendAccountRejectedEmail } = require('../utils/emailService');
+const { multerUpload, toCloudinary, resizeImage, hasCloudinary } = require('../middleware/upload');
 
 // trackAiRequest / markAiRateLimited are now handled by geminiPool
 function trackAiRequest(key) { if(key) geminiPool.trackRequest(key); }
@@ -202,9 +204,14 @@ router.get('/api/admin/stats', requireAdmin, (req, res) => {
   const bannedUsers   = db.prepare("SELECT COUNT(*) as c FROM users WHERE is_active = 0 AND account_status = 'approved'").get().c;
   const pendingVerif     = db.prepare("SELECT COUNT(*) as c FROM id_verification_requests WHERE status = 'pending'").get().c;
   const pendingAccounts  = db.prepare("SELECT COUNT(*) as c FROM users WHERE account_status = 'pending'").get().c;
+  // All approved non-admin residents (including those not yet assigned a bed)
+  const totalResidents   = db.prepare("SELECT COUNT(*) as c FROM users WHERE account_status='approved' AND role='user' AND is_active=1").get().c;
+  const assignedResidents= db.prepare("SELECT COUNT(*) as c FROM bed_assignments ba JOIN users u ON u.id=ba.user_id WHERE u.account_status='approved'").get().c;
+  const unassignedResidents = totalResidents - assignedResidents;
   res.json({ totalUsers, totalPosts, pendingPosts, rejectedPosts, verifiedUsers,
              googleUsers, totalComments, totalLikes, totalFollows, bannedUsers,
-             pendingVerif, pendingAccounts });
+             pendingVerif, pendingAccounts,
+             totalResidents, assignedResidents, unassignedResidents });
 });
 
 // ── Users ──────────────────────────────────────────────
@@ -215,6 +222,7 @@ router.get('/api/admin/users', requireAdmin, (req, res) => {
     SELECT u.id, u.first_name, u.middle_name, u.last_name, u.username, u.email, u.auth_provider,
       u.id_verified, u.is_active, u.role, u.avatar, u.created_at, u.account_status,
       u.sex, u.course, u.year_level,
+      u.present_address, u.permanent_address,
       dr.room_number, ba.bed_number
     FROM users u
     LEFT JOIN bed_assignments ba ON ba.user_id = u.id
@@ -230,6 +238,8 @@ router.get('/api/admin/users', requireAdmin, (req, res) => {
     sex: r.sex || '',            // Required for dormitory gender-room matching
     course: r.course || '',
     yearLevel: r.year_level || '',
+    presentAddress:   r.present_address   || '',
+    permanentAddress: r.permanent_address || '',
     roomNumber: r.room_number || '',   // Bed assignment (null if unassigned)
     bedNumber:  r.bed_number  || '',
   }));
@@ -1353,6 +1363,19 @@ router.get('/api/admin/users/:id/reputation', requireAdmin, (req, res) => {
   } catch (err) { send500(res, err); }
 });
 
+// ── Batch reputation — GET /api/admin/users/reputation/batch?ids=id1,id2,... ──
+// Returns { scores: { [userId]: number } } in one round-trip.
+// Eliminates the N-request flood that refreshAll() previously triggered.
+router.get('/api/admin/users/reputation/batch', requireAdmin, (req, res) => {
+  try {
+    const ids = (req.query.ids || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (!ids.length) return res.json({ scores: {} });
+    const scores = {};
+    ids.forEach(id => { scores[id] = getReputationScore(id); });
+    res.json({ scores });
+  } catch (err) { send500(res, err); }
+});
+
 // ╔══════════════════════════════════════════════════════════════════════════════╗
 // ║  MAINTENANCE REQUESTS (Admin)                                                ║
 // ╚══════════════════════════════════════════════════════════════════════════════╝
@@ -1411,20 +1434,117 @@ router.get('/api/admin/utility/trend', requireAdmin, (req, res) => {
   } catch (err) { send500(res, err); }
 });
 
-/** POST /api/admin/utility/bills — upsert a bill */
-router.post('/api/admin/utility/bills', requireAdmin, (req, res) => {
+/** POST /api/admin/utility/bills — upsert a bill (multipart: optional 'image' field) */
+router.post('/api/admin/utility/bills', requireAdmin, multerUpload.single('image'), async (req, res) => {
   try {
-    const { month, type, amount, unitUsed, note } = req.body;
+    const { month, type, amount, unitUsed, note, removeImage } = req.body;
     if (!month || !type || amount == null) return res.status(400).json({ error: 'month, type, and amount are required' });
     if (!['electricity','water'].includes(type)) return res.status(400).json({ error: 'type must be electricity or water' });
     const parsed = parseFloat(amount);
     if (isNaN(parsed) || parsed < 0) return res.status(400).json({ error: 'amount must be a non-negative number' });
-    upsertUtilityBill({ month, type, amount: parsed, unitUsed: unitUsed != null ? parseFloat(unitUsed) : null, note: note?.trim() || null });
+
+    // Fetch existing row to preserve image if not changing it
+    const existing = db.prepare("SELECT image_url FROM utility_bills WHERE month = ? AND type = ?").get(month, type);
+
+    // ── Determine image state ────────────────────────────────────────────────
+    // Three cases: explicit removal, new upload, or no change (preserve existing).
+    // removeImage flag is propagated all the way to upsertUtilityBill so the DB
+    // CASE WHEN guard doesn't silently block the intentional clear.
+    const isRemoval = removeImage === '1';
+    let imageUrl = '';
+
+    if (isRemoval) {
+      // Caller wants the photo gone — imageUrl stays '' and removeImage=true reaches DB.
+      log.info(`[admin] Utility bill image removed for ${type} ${month} by @${req.user?.username}`);
+    } else if (req.file) {
+      // New image uploaded — resize and store.
+      const buf = await resizeImage(req.file.buffer, { width: 1400, quality: 82 });
+      imageUrl = hasCloudinary
+        ? (await toCloudinary(buf, 'damis/utility-bills')).secure_url
+        : `data:${req.file.mimetype};base64,${buf.toString('base64')}`;
+      log.info(`[admin] Utility bill image uploaded: ${imageUrl.slice(0, 60)}…`);
+    } else {
+      // No image change — preserve whatever is in the DB (handled by CASE WHEN in upsert).
+      imageUrl = '';
+    }
+
+    upsertUtilityBill({
+      month,
+      type,
+      amount:      parsed,
+      unitUsed:    unitUsed != null ? parseFloat(unitUsed) : null,
+      note:        note?.trim() || null,
+      imageUrl,
+      removeImage: isRemoval,
+    });
     logAdminAction(req.user?.id, 'utility_bill_upsert', `${type} ${month} ₱${parsed}`);
     log.info(`[admin] Utility bill upserted: ${type} ${month} ₱${parsed} by @${req.user?.username}`);
     res.json({ success: true });
   } catch (err) { send500(res, err); }
 });
+
+// ── GCash QR / payment info upload ──────────────────────────────────────────
+// Stored as a settings key so it's shared across all billing months.
+// POST /api/admin/billing/gcash-qr   multipart: 'qr' field (image)
+router.post('/api/admin/billing/gcash-qr', requireAdmin, multerUpload.single('qr'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No image uploaded.' });
+    const buf = await resizeImage(req.file.buffer, { width: 800, quality: 88 });
+    const url = hasCloudinary
+      ? (await toCloudinary(buf, 'damis/gcash')).secure_url
+      : `data:${req.file.mimetype};base64,${buf.toString('base64')}`;
+    setSetting('gcash_qr_url', url);
+    logAdminAction(req.user?.id, 'gcash_qr_upload', url.slice(0, 80));
+    log.info(`[admin] GCash QR uploaded by @${req.user?.username}`);
+    res.json({ success: true, url });
+  } catch (err) { send500(res, err); }
+});
+
+/** GET /api/admin/billing/gcash-qr — fetch current GCash QR URL (and number) */
+router.get('/api/admin/billing/gcash-qr', requireAdmin, (req, res) => {
+  res.json({
+    url:    getSetting('gcash_qr_url', ''),
+    number: getSetting('gcash_number', ''),
+  });
+});
+
+/** PUT /api/admin/billing/gcash-number — save GCash number text */
+router.put('/api/admin/billing/gcash-number', requireAdmin, (req, res) => {
+  const { number } = req.body;
+  setSetting('gcash_number', (number || '').trim());
+  log.info(`[admin] GCash number updated by @${req.user?.username}`);
+  res.json({ success: true });
+});
+
+/** DELETE /api/admin/billing/:billId/receipt — admin clears a resident's uploaded receipt */
+router.delete('/api/admin/billing/:billId/receipt', requireAdmin, (req, res) => {
+  try {
+    clearBillReceipt(req.params.billId);
+    logAdminAction(req.user?.id, 'bill_receipt_clear', req.params.billId);
+    res.json({ success: true });
+  } catch (err) { send500(res, err); }
+});
+
+/** DELETE /api/admin/dormitory/billing/:id/receipt — alias under dormitory prefix */
+router.delete('/api/admin/dormitory/billing/:id/receipt', requireAdmin, (req, res) => {
+  try {
+    clearBillReceipt(req.params.id);
+    logAdminAction(req.user?.id, 'bill_receipt_clear', req.params.id);
+    log.info(`[admin] Receipt cleared for bill ${req.params.id} by @${req.user?.username}`);
+    res.json({ success: true });
+  } catch (err) { send500(res, err); }
+});
+
+/** DELETE /api/admin/billing/gcash-qr — remove GCash QR image */
+router.delete('/api/admin/billing/gcash-qr', requireAdmin, (req, res) => {
+  try {
+    setSetting('gcash_qr_url', '');
+    logAdminAction(req.user?.id, 'gcash_qr_remove', 'removed');
+    log.info(`[admin] GCash QR removed by @${req.user?.username}`);
+    res.json({ success: true });
+  } catch (err) { send500(res, err); }
+});
+
 
 // ╔══════════════════════════════════════════════════════════════════════════════╗
 // ║  EXPORT ENDPOINTS (data for client-side Excel/PDF generation)                ║

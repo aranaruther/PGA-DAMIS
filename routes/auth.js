@@ -155,7 +155,7 @@ router.post('/api/auth/complete-registration', ...uploadIdDocs, async (req, res)
       location, idType,
       // DAMIS new fields
       civilStatus, presentAddress, permanentAddress,
-      schoolName, course, yearLevel, schoolAddress,
+      schoolName, course, yearLevel, schoolAddress, specialization,
       fatherInfo, motherInfo, monthlyIncome,
       avatarFaceX, avatarFaceY,
     } = req.body;
@@ -164,7 +164,7 @@ router.post('/api/auth/complete-registration', ...uploadIdDocs, async (req, res)
     // username validation removed — username field removed from registration form
     if (!birthday)          return res.status(400).json({ error: 'Date of birth is required.' });
     if (getAge(birthday) < 13) return res.status(400).json({ error: 'You must be at least 13 years old.' });
-    if (!sex)               return res.status(400).json({ error: 'Sex at birth is required.' });
+    if (!sex)               return res.status(400).json({ error: 'Sex is required.' });
 
     if (!phone?.trim()) return res.status(400).json({ error: 'Phone number is required.' });
     const phoneClean = phone.trim().replace(/\D/g, '');
@@ -211,6 +211,7 @@ router.post('/api/auth/complete-registration', ...uploadIdDocs, async (req, res)
       course:           course?.trim()           || '',
       yearLevel:        yearLevel?.trim()        || '',
       schoolAddress:    schoolAddress?.trim()    || 'Zabali, Baler, Aurora',
+      specialization:   specialization?.trim()  || '',
       fatherInfo:       fatherInfo              || '',
       motherInfo:       motherInfo              || '',
       monthlyIncome:    monthlyIncome?.trim()    || '',
@@ -235,8 +236,9 @@ router.post('/api/auth/complete-registration', ...uploadIdDocs, async (req, res)
       civilStatus:      civilStatus || '(not set)',
       presentAddress:   presentAddress || '(not set)',
       permanentAddress: permanentAddress || '(same as present)',
-      course:           course || '(not set)',
       yearLevel:        yearLevel || '(not set)',
+      course:           course || '(not set)',
+      specialization:   specialization || '(none)',
       monthlyIncome:    monthlyIncome || '(not set)',
       authProvider:     pg ? 'google' : 'local',
     });
@@ -244,10 +246,12 @@ router.post('/api/auth/complete-registration', ...uploadIdDocs, async (req, res)
     // ── Submit ID verification if files were uploaded ──
     const idUrls = req.idDocUrls || {};
     log.dump('Uploaded files', {
-      avatar:   idUrls.avatar   ? `✔ ${String(idUrls.avatar).slice(0, 55)}…`   : false,
-      id_front: idUrls.id_front ? `✔ ${String(idUrls.id_front).slice(0, 55)}…` : false,
-      id_back:  idUrls.id_back  ? `✔ ${String(idUrls.id_back).slice(0, 55)}…`  : false,
-      selfie:   idUrls.selfie   ? `✔ ${String(idUrls.selfie).slice(0, 55)}…`   : false,
+      avatar:           idUrls.avatar           ? `✔ ${String(idUrls.avatar).slice(0, 55)}…`           : '✖ missing',
+      id_front:         idUrls.id_front         ? `✔ ${String(idUrls.id_front).slice(0, 55)}…`         : '✖ missing',
+      selfie:           idUrls.selfie           ? `✔ ${String(idUrls.selfie).slice(0, 55)}…`           : '✖ missing',
+      cert_residency:   idUrls.cert_residency   ? `✔ ${String(idUrls.cert_residency).slice(0, 55)}…`   : '✖ missing',
+      cert_low_income:  idUrls.cert_low_income  ? `✔ ${String(idUrls.cert_low_income).slice(0, 55)}…`  : '✖ missing',
+      cert_enrollment:  idUrls.cert_enrollment  ? `✔ ${String(idUrls.cert_enrollment).slice(0, 55)}…`  : '✖ missing',
     });
     if (idUrls.id_front || idUrls.cert_residency || idUrls.cert_low_income || idUrls.cert_enrollment || idUrls.selfie || idUrls.avatar) {
       try {
@@ -794,5 +798,86 @@ router.post('/api/auth/reset-password', async (req, res) => {
     return res.status(500).json({ error: 'Server error. Please try again.' });
   }
 });
+
+// ── DOCX → PDF conversion (used by the registration document preview) ─────────
+// Accepts a DOCX file upload and returns a PDF so the browser can show an
+// accurate print-preview with formatting intact.  No auth required because this
+// is called during account creation before the user has a session.
+//
+// POST /api/auth/convert-docx-to-pdf   multipart: 'file' field (DOCX)
+// Returns: application/pdf stream, or JSON error on failure.
+{
+  const multer = require('multer');
+  const os     = require('os');
+  const fs     = require('fs');
+  const path   = require('path');
+  const { execFile } = require('child_process');
+
+  const docxUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 15 * 1024 * 1024, files: 1 },
+    fileFilter: (_req, file, cb) => {
+      const ok = file.originalname.toLowerCase().endsWith('.docx') ||
+                 file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      cb(ok ? null : new Error('Only .docx files are accepted'), ok);
+    },
+  }).single('file');
+
+  router.post('/api/auth/convert-docx-to-pdf', (req, res) => {
+    docxUpload(req, res, async (err) => {
+      if (err) {
+        log.warn('[docx-convert] Upload error:', err.message);
+        return res.status(400).json({ error: err.message });
+      }
+      if (!req.file) {
+        return res.status(400).json({ error: 'No DOCX file received.' });
+      }
+
+      // Write the uploaded buffer to a temp file so LibreOffice can read it
+      const tmpDir  = fs.mkdtempSync(path.join(os.tmpdir(), 'damis-docx-'));
+      const inPath  = path.join(tmpDir, 'input.docx');
+      const outPath = path.join(tmpDir, 'input.pdf');
+
+      try {
+        fs.writeFileSync(inPath, req.file.buffer);
+
+        await new Promise((resolve, reject) => {
+          // --headless --convert-to pdf --outdir <dir> <file>
+          // LibreOffice names the output <basename>.pdf in the same outdir.
+          execFile(
+            'libreoffice',
+            ['--headless', '--convert-to', 'pdf', '--outdir', tmpDir, inPath],
+            { timeout: 30_000 },
+            (convErr, _stdout, stderr) => {
+              if (convErr) {
+                log.warn('[docx-convert] LibreOffice error:', stderr || convErr.message);
+                return reject(new Error('Conversion failed — LibreOffice error'));
+              }
+              resolve();
+            }
+          );
+        });
+
+        if (!fs.existsSync(outPath)) {
+          throw new Error('PDF not generated — unexpected LibreOffice output');
+        }
+
+        const pdfBuf = fs.readFileSync(outPath);
+        log.info(`[docx-convert] Converted ${req.file.originalname} → PDF (${pdfBuf.length} bytes)`);
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'inline; filename="preview.pdf"');
+        res.setHeader('Content-Length', pdfBuf.length);
+        return res.send(pdfBuf);
+      } catch (convErr) {
+        log.warn('[docx-convert]', convErr.message);
+        return res.status(500).json({ error: convErr.message });
+      } finally {
+        // Clean up temp files regardless of outcome
+        try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (_) {}
+      }
+    });
+  });
+}
 
 module.exports = router;

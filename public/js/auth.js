@@ -1,3 +1,5 @@
+// public/js/auth.js
+
 'use strict';
 
 // ═══════════════════════════════════════════════════
@@ -153,8 +155,8 @@ function back(from) {
     return;
   }
   stopCamera();
+  stopSelfieCamera();
   $('step-' + from).classList.add('hidden');
-  currentStep = from - 1;
   var prev = $('step-' + currentStep);
   if (prev) prev.classList.remove('hidden');
   updateProgress(currentStep);
@@ -558,7 +560,7 @@ async function validateStep(step) {
 
     // Sex
     var sex = document.querySelector('input[name="sex"]:checked');
-    if (!sex) { showStepError(3, 'Please select your sex at birth.'); return false; }
+    if (!sex) { showStepError(3, 'Please select your sex.'); return false; }
 
     // Phone
     if (!validatePhoneInline()) { showStepError(3, 'A valid Philippine phone number is required.'); $('reg-phone').focus(); return false; }
@@ -597,12 +599,45 @@ async function validateStep(step) {
       if ($('pres-addr-hidden')) $('pres-addr-hidden').value = $('perm-addr-hidden') ? $('perm-addr-hidden').value : '';
     }
 
-    // School
-    if (!$('reg-course') || !$('reg-course').value)    { showStepError(3, 'Please select your course/school.'); return false; }
+    // School — Year Level first, then Course, then optional Specialization
     if (!$('reg-yearlevel') || !$('reg-yearlevel').value) { showStepError(3, 'Please select your year level.'); return false; }
+    if (!$('reg-course') || !$('reg-course').value)       { showStepError(3, 'Please select your program / course.'); return false; }
+    // Specialization: required only when the row is visible
+    var specRow = $('specialization-row');
+    if (specRow && !specRow.classList.contains('hidden')) {
+      if (!$('reg-specialization') || !$('reg-specialization').value) {
+        showStepError(3, 'Please select your major / specialization.'); return false;
+      }
+    }
 
     // Monthly Income
     if (!$('reg-income') || !$('reg-income').value)    { showStepError(3, 'Please select your combined monthly income bracket.'); return false; }
+
+    // ── Parent Information (required) ────────────────────────────────────────
+    var fFname    = ($('father-fname')||{}).value?.trim();
+    var fLname    = ($('father-lname')||{}).value?.trim();
+    var fPhone    = ($('father-phone')||{}).value?.replace(/\D/g,'') || '';
+    var fEmployer = ($('father-employer')||{}).value?.trim();
+    var fAddr     = ($('father-addr-hidden')||{}).value?.trim();
+    if (!fFname) { showStepError(3, "Father's first name is required."); $('father-fname')?.focus(); return false; }
+    if (!fLname) { showStepError(3, "Father's last name is required.");  $('father-lname')?.focus(); return false; }
+    if (!fPhone || fPhone.length < 10) { showStepError(3, "Father's contact number must be 10 digits."); $('father-phone')?.focus(); return false; }
+    if (fPhone[0] !== '9') { showStepError(3, "Father's contact number must start with 9."); $('father-phone')?.focus(); return false; }
+    if (!fEmployer) { showStepError(3, "Father's employer / company is required."); $('father-employer')?.focus(); return false; }
+    // Address required unless "Same as Permanent" is checked (which populates the hidden field)
+    if (!fAddr) { showStepError(3, "Father's address is required. Select from the dropdowns or check \"Same as Permanent\"."); $('father-region')?.focus(); return false; }
+
+    var mFname    = ($('mother-fname')||{}).value?.trim();
+    var mLname    = ($('mother-lname')||{}).value?.trim();
+    var mPhone    = ($('mother-phone')||{}).value?.replace(/\D/g,'') || '';
+    var mEmployer = ($('mother-employer')||{}).value?.trim();
+    var mAddr     = ($('mother-addr-hidden')||{}).value?.trim();
+    if (!mFname) { showStepError(3, "Mother's first name is required."); $('mother-fname')?.focus(); return false; }
+    if (!mLname) { showStepError(3, "Mother's last name is required.");  $('mother-lname')?.focus(); return false; }
+    if (!mPhone || mPhone.length < 10) { showStepError(3, "Mother's contact number must be 10 digits."); $('mother-phone')?.focus(); return false; }
+    if (mPhone[0] !== '9') { showStepError(3, "Mother's contact number must start with 9."); $('mother-phone')?.focus(); return false; }
+    if (!mEmployer) { showStepError(3, "Mother's employer / company is required."); $('mother-employer')?.focus(); return false; }
+    if (!mAddr) { showStepError(3, "Mother's address is required. Select from the dropdowns or check \"Same as Permanent\"."); $('mother-region')?.focus(); return false; }
 
     hideStepError(3);
     return true;
@@ -1218,10 +1253,14 @@ function handleDocFile(evt, key) {
   hideStepError(5);
   window._damis_docs[key] = file;
   var def = $('doc-def-' + key), prev = $('doc-prev-' + key), fn = $('doc-fn-' + key);
+  var sz  = $('doc-sz-' + key);
   var thumb = $('doc-thumb-' + key);
   if (def)  def.classList.add('hidden');
   if (prev) prev.classList.remove('hidden');
-  if (fn)   fn.textContent = file.name;
+  if (fn)   fn.textContent = file.name.length > 32 ? file.name.slice(0, 30) + '\u2026' : file.name;
+  // ── Show file size ───────────────────────────────
+  if (sz)   sz.textContent = formatBytes(file.size);
+  console.log('[DAMIS Doc] ' + key + ' uploaded: ' + file.name + ' (' + formatBytes(file.size) + ')');
   // Show thumbnail
   if (thumb) {
     thumb.innerHTML = '';
@@ -1249,8 +1288,55 @@ function handleDocFile(evt, key) {
         + 'display:flex;align-items:center;gap:5px;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.25);">'
         + '<i class="fa-solid fa-up-right-from-square" style="font-size:10px;"></i> Open Full Page</a>'
         + '</div>';
-    } else {
-      thumb.innerHTML = '<div class="flex flex-col items-center justify-center py-6 gap-2"><i class="fa-solid fa-file-word text-blue-500 text-4xl"></i><p class="text-sm font-semibold text-slate-600">Word Document</p></div>';
+    } else if (isDocx) {
+      // Convert DOCX → PDF on the server via LibreOffice for an accurate print-preview.
+      // Mammoth's client-side HTML conversion drops most formatting; a server-side PDF
+      // round-trip renders the document exactly as it looks when printed.
+      thumb.innerHTML =
+        '<div class="flex flex-col items-center justify-center py-6 gap-2 text-slate-400">'
+        + '<i class="fa-solid fa-spinner fa-spin text-2xl"></i>'
+        + '<p class="text-xs">Converting to PDF preview…</p>'
+        + '</div>';
+      (async () => {
+        try {
+          var arrayBuf = await file.arrayBuffer();
+          var fd       = new FormData();
+          fd.append('file', new Blob([arrayBuf], { type: file.type }), file.name);
+
+          var resp = await fetch('/api/auth/convert-docx-to-pdf', { method: 'POST', body: fd });
+          if (!resp.ok) {
+            var errData = await resp.json().catch(function(){ return {}; });
+            throw new Error(errData.error || ('Server error ' + resp.status));
+          }
+
+          var pdfBlob = await resp.blob();
+          var pdfUrl  = URL.createObjectURL(pdfBlob);
+          thumb.dataset.pdfObjUrl = pdfUrl; // reuse existing revoke logic in clearDocFile
+
+          thumb.innerHTML =
+            '<div style="position:relative;width:100%;height:440px;background:#f8fafc;">'
+            + '<iframe src="' + pdfUrl + '#toolbar=0&navpanes=0&scrollbar=1&view=FitH" '
+            + 'style="width:100%;height:100%;border:none;" title="' + file.name + '"></iframe>'
+            + '<a href="' + pdfUrl + '" target="_blank" rel="noopener" '
+            + 'onclick="event.stopPropagation()" '
+            + 'style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.6);color:#fff;'
+            + 'font-size:11px;font-weight:700;padding:5px 11px;border-radius:7px;text-decoration:none;'
+            + 'display:flex;align-items:center;gap:5px;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.25);">'
+            + '<i class="fa-solid fa-up-right-from-square" style="font-size:10px;"></i> Open Full Page</a>'
+            + '</div>';
+
+          console.log('[DAMIS Doc] ' + key + ' DOCX→PDF preview ready (' + Math.round(pdfBlob.size / 1024) + ' KB)');
+        } catch (err) {
+          console.error('[DAMIS Doc] DOCX→PDF error for ' + key + ':', err);
+          thumb.innerHTML =
+            '<div class="flex flex-col items-center justify-center py-6 gap-2">'
+            + '<i class="fa-solid fa-file-word text-blue-500 text-4xl"></i>'
+            + '<p class="text-sm font-semibold text-slate-600">Word Document</p>'
+            + '<p class="text-xs text-slate-400">Preview unavailable — file will upload correctly.</p>'
+            + '<p class="text-xs text-red-400">' + (err.message || 'Conversion error') + '</p>'
+            + '</div>';
+        }
+      })();
     }
   }
 }
@@ -1269,13 +1355,17 @@ function clearDocFile(evt, key) {
   delete window._damis_docs[key];
   var fileInput = $('doc-file-' + key), def = $('doc-def-' + key), prev = $('doc-prev-' + key);
   var thumb = $('doc-thumb-' + key);
+  var sz    = $('doc-sz-' + key);
   if (fileInput) fileInput.value = '';
   if (def)  def.classList.remove('hidden');
   if (prev) prev.classList.add('hidden');
+  if (sz)   sz.textContent = '';
   if (thumb) {
-    if (thumb.dataset.pdfObjUrl) { URL.revokeObjectURL(thumb.dataset.pdfObjUrl); delete thumb.dataset.pdfObjUrl; }
+    if (thumb.dataset.pdfObjUrl)  { URL.revokeObjectURL(thumb.dataset.pdfObjUrl);  delete thumb.dataset.pdfObjUrl; }
+    if (thumb.dataset.docxBlobUrl) { URL.revokeObjectURL(thumb.dataset.docxBlobUrl); delete thumb.dataset.docxBlobUrl; }
     thumb.innerHTML = '';
   }
+  console.log('[DAMIS Doc] ' + key + ' cleared');
   hideStepError(5);
 }
 
@@ -1505,9 +1595,18 @@ async function completeRegistration() {
 
     // School
     fd.append('schoolName',   $('reg-school') ? $('reg-school').value : 'Aurora State College of Technology');
-    fd.append('course',       $('reg-course') ? $('reg-course').value : '');
-    fd.append('yearLevel',    $('reg-yearlevel') ? $('reg-yearlevel').value : '');
     fd.append('schoolAddress', $('reg-schooladdr') ? $('reg-schooladdr').value : 'Zabali, Baler, Aurora');
+    fd.append('yearLevel',    $('reg-yearlevel') ? $('reg-yearlevel').options[$('reg-yearlevel').selectedIndex].text : '');
+    // Course: if a specialization was selected, its value IS the specific course code
+    // (e.g. BSIT-AP); otherwise the family key equals the code for single-track programs.
+    var specRow  = $('specialization-row');
+    var specSel  = $('reg-specialization');
+    var specVal  = (specRow && !specRow.classList.contains('hidden') && specSel && specSel.value)
+                    ? specSel.value : '';
+    var courseVal = specVal || ($('reg-course') ? $('reg-course').value : '');
+    fd.append('course',         courseVal);
+    fd.append('specialization', specVal);
+    console.log('[REG] course=' + courseVal + ' specialization=' + (specVal || '(none)'));
 
     // Family info
     var fatherInfo = JSON.stringify({
@@ -2627,6 +2726,413 @@ async function sendSupportMsg() {
       setTimeout(() => { if(input) input.focus(); }, 50);
     }
   }
+}
+
+// ═══════════════════════════════════════════════════
+// ASCOT COURSE CATALOG — Year-Level Cascade
+// ─────────────────────────────────────────────────
+// Each entry describes ONE enrollable program track.
+//
+// Fields:
+//   value      — unique submission code (sent to the backend)
+//   family     — groups programs sharing the same base title (for dedup in dropdown)
+//   familyLabel— label shown in the course <select> (shared by all siblings)
+//   type       — 'bachelor' | 'diploma' | 'associate' | 'certificate' | 'postgrad'
+//   school     — <optgroup> label
+//   minYear    — first year a student can be in this program (always 1)
+//   maxYear    — last year a student can be in this program (program duration)
+//   major      — optional: the Major / Specialization label for this track
+//
+// Year-level filtering rules
+// ─────────────────────────
+//   General  : show courses where  minYear ≤ selectedYear ≤ maxYear
+//   1st-year : per school, if ANY non-degree programs (diploma/associate/certificate)
+//              exist in that school → suppress ALL bachelor/postgrad entries for
+//              that school (non-degree programs are the entry-level track).
+//              Schools with ONLY bachelor programs show their bachelor entries normally.
+//
+// Deduplication
+// ─────────────
+//   The dropdown shows ONE option per `family`.
+//   If members of a family have `major` fields, the Specialization dropdown appears
+//   after the user picks that family.
+// ═══════════════════════════════════════════════════
+var ASCOT_COURSES = [
+
+  // ── School of Forestry and Environmental Sciences ──────────────────────────
+  // Non-degree (2 yr) → shown for yr 1-2; bachelor (4 yr) → shown for yr 1-4
+  // 1st-year rule: DFT exists → suppress BSF/BSES for yr 1
+  { value: 'BSF',  family: 'BSF',  familyLabel: 'Bachelor of Science in Forestry (BSF)',               type: 'bachelor', minYear: 1, maxYear: 4, school: 'School of Forestry and Environmental Sciences' },
+  { value: 'BSES', family: 'BSES', familyLabel: 'Bachelor of Science in Environmental Science (BSES)', type: 'bachelor', minYear: 1, maxYear: 4, school: 'School of Forestry and Environmental Sciences' },
+  { value: 'DFT',  family: 'DFT',  familyLabel: 'Diploma in Forest Technology (2 Years)',              type: 'diploma',  minYear: 1, maxYear: 2, school: 'School of Forestry and Environmental Sciences' },
+
+  // ── School of Education ─────────────────────────────────────────────────────
+  // No non-degree programs → bachelor's shown for all year levels (including 1st)
+  { value: 'BEEd',      family: 'BEEd', familyLabel: 'Bachelor of Elementary Education (BEEd)',               type: 'bachelor', minYear: 1, maxYear: 4, school: 'School of Education' },
+  { value: 'BPEd',      family: 'BPEd', familyLabel: 'Bachelor of Physical Education (BPEd)',                 type: 'bachelor', minYear: 1, maxYear: 4, school: 'School of Education' },
+  // BSEd family — 5 majors share one dropdown entry
+  { value: 'BSEd-EN',   family: 'BSEd', familyLabel: 'Bachelor of Secondary Education (BSEd)',                type: 'bachelor', minYear: 1, maxYear: 4, school: 'School of Education', major: 'Major in English' },
+  { value: 'BSEd-FIL',  family: 'BSEd', familyLabel: 'Bachelor of Secondary Education (BSEd)',                type: 'bachelor', minYear: 1, maxYear: 4, school: 'School of Education', major: 'Major in Filipino' },
+  { value: 'BSEd-MATH', family: 'BSEd', familyLabel: 'Bachelor of Secondary Education (BSEd)',                type: 'bachelor', minYear: 1, maxYear: 4, school: 'School of Education', major: 'Major in Mathematics' },
+  { value: 'BSEd-SCI',  family: 'BSEd', familyLabel: 'Bachelor of Secondary Education (BSEd)',                type: 'bachelor', minYear: 1, maxYear: 4, school: 'School of Education', major: 'Major in Science' },
+  { value: 'BSEd-SS',   family: 'BSEd', familyLabel: 'Bachelor of Secondary Education (BSEd)',                type: 'bachelor', minYear: 1, maxYear: 4, school: 'School of Education', major: 'Major in Social Studies' },
+  // BTLE family — 2 majors
+  { value: 'BTLE-HE',  family: 'BTLE', familyLabel: 'Bachelor of Technology and Livelihood Education (BTLE)', type: 'bachelor', minYear: 1, maxYear: 4, school: 'School of Education', major: 'Major in Home Economics' },
+  { value: 'BTLE-ICT', family: 'BTLE', familyLabel: 'Bachelor of Technology and Livelihood Education (BTLE)', type: 'bachelor', minYear: 1, maxYear: 4, school: 'School of Education', major: 'Major in Information and Communication Technology' },
+
+  // ── School of Agricultural Sciences ─────────────────────────────────────────
+  // 1st-year rule: CAS (associate 2yr) exists → suppress BSA bachelor for yr 1
+  { value: 'BSA-AS', family: 'BSA', familyLabel: 'Bachelor of Science in Agriculture (BSA)',                  type: 'bachelor', minYear: 1, maxYear: 4, school: 'School of Agricultural Sciences', major: 'Major in Animal Science' },
+  { value: 'BSA-CS', family: 'BSA', familyLabel: 'Bachelor of Science in Agriculture (BSA)',                  type: 'bachelor', minYear: 1, maxYear: 4, school: 'School of Agricultural Sciences', major: 'Major in Crop Science (Agronomy/Horticulture)' },
+  { value: 'CAS',    family: 'CAS', familyLabel: 'Certificate in Agricultural Science (2 Years)',             type: 'associate',minYear: 1, maxYear: 2, school: 'School of Agricultural Sciences' },
+
+  // ── School of Arts and Sciences ──────────────────────────────────────────────
+  // No non-degree programs → bachelor shown for all year levels
+  { value: 'ABPolSci', family: 'ABPolSci', familyLabel: 'Bachelor of Arts in Political Science',              type: 'bachelor', minYear: 1, maxYear: 4, school: 'School of Arts and Sciences' },
+
+  // ── School of Engineering ─────────────────────────────────────────────────────
+  // No non-degree programs → bachelor shown for all year levels (5-year programs)
+  { value: 'BSCE', family: 'BSCE', familyLabel: 'Bachelor of Science in Civil Engineering (BSCE)',            type: 'bachelor', minYear: 1, maxYear: 5, school: 'School of Engineering' },
+  { value: 'BSEE', family: 'BSEE', familyLabel: 'Bachelor of Science in Electrical Engineering (BSEE)',      type: 'bachelor', minYear: 1, maxYear: 5, school: 'School of Engineering' },
+  { value: 'BSME', family: 'BSME', familyLabel: 'Bachelor of Science in Mechanical Engineering (BSME)',      type: 'bachelor', minYear: 1, maxYear: 5, school: 'School of Engineering' },
+
+  // ── School of Fisheries and Ocean Sciences ────────────────────────────────────
+  // No non-degree programs → bachelor shown for all year levels
+  { value: 'BSFish', family: 'BSFish', familyLabel: 'Bachelor of Science in Fisheries',                      type: 'bachelor', minYear: 1, maxYear: 4, school: 'School of Fisheries and Ocean Sciences' },
+
+  // ── School of Industrial Technology ──────────────────────────────────────────
+  // 1st-year rule: certificates/associates/diplomas exist → suppress BIT bachelor for yr 1
+  // BIT family — 4 majors share one dropdown entry
+  { value: 'BIT-AET', family: 'BIT', familyLabel: 'Bachelor in Industrial Technology (BIT)',                  type: 'bachelor', minYear: 1, maxYear: 4, school: 'School of Industrial Technology', major: 'Major in Automotive Engineering Technology' },
+  { value: 'BIT-CET', family: 'BIT', familyLabel: 'Bachelor in Industrial Technology (BIT)',                  type: 'bachelor', minYear: 1, maxYear: 4, school: 'School of Industrial Technology', major: 'Major in Civil Engineering Technology' },
+  { value: 'BIT-EET', family: 'BIT', familyLabel: 'Bachelor in Industrial Technology (BIT)',                  type: 'bachelor', minYear: 1, maxYear: 4, school: 'School of Industrial Technology', major: 'Major in Electrical Engineering Technology' },
+  { value: 'BIT-FT',  family: 'BIT', familyLabel: 'Bachelor in Industrial Technology (BIT)',                  type: 'bachelor', minYear: 1, maxYear: 4, school: 'School of Industrial Technology', major: 'Major in Food Technology' },
+  // 3-year diploma programs
+  { value: 'DipAET', family: 'DipAET', familyLabel: 'Diploma in Automotive Engineering Technician (3 years)', type: 'diploma',     minYear: 1, maxYear: 3, school: 'School of Industrial Technology' },
+  { value: 'DipCET', family: 'DipCET', familyLabel: 'Diploma in Civil Engineering Technician (3 years)',      type: 'diploma',     minYear: 1, maxYear: 3, school: 'School of Industrial Technology' },
+  { value: 'DipEET', family: 'DipEET', familyLabel: 'Diploma in Electrical Engineering Technician (3 years)', type: 'diploma',     minYear: 1, maxYear: 3, school: 'School of Industrial Technology' },
+  { value: 'DipFT',  family: 'DipFT',  familyLabel: 'Diploma in Food Technology (3 years)',                   type: 'diploma',     minYear: 1, maxYear: 3, school: 'School of Industrial Technology' },
+  // 2-year associate programs
+  { value: 'AssocAET', family: 'AssocAET', familyLabel: 'Associate in Automotive Engineering Technician (2 years)', type: 'associate', minYear: 1, maxYear: 2, school: 'School of Industrial Technology' },
+  { value: 'AssocCET', family: 'AssocCET', familyLabel: 'Associate in Civil Engineering Technician (2 years)',       type: 'associate', minYear: 1, maxYear: 2, school: 'School of Industrial Technology' },
+  { value: 'AssocEET', family: 'AssocEET', familyLabel: 'Associate in Electrical Engineering Technician (2 years)',  type: 'associate', minYear: 1, maxYear: 2, school: 'School of Industrial Technology' },
+  { value: 'AssocFT',  family: 'AssocFT',  familyLabel: 'Associate in Food Technology (2 years)',                    type: 'associate', minYear: 1, maxYear: 2, school: 'School of Industrial Technology' },
+  // 1-year certificate programs
+  { value: 'CertAET', family: 'CertAET', familyLabel: 'Certificate in Automotive Engineering Technician (1 year)',  type: 'certificate', minYear: 1, maxYear: 1, school: 'School of Industrial Technology' },
+  { value: 'CertCET', family: 'CertCET', familyLabel: 'Certificate in Civil Engineering Technician (1 year)',        type: 'certificate', minYear: 1, maxYear: 1, school: 'School of Industrial Technology' },
+  { value: 'CertEET', family: 'CertEET', familyLabel: 'Certificate in Electrical Engineering Technician (1 year)',   type: 'certificate', minYear: 1, maxYear: 1, school: 'School of Industrial Technology' },
+  { value: 'CertFT',  family: 'CertFT',  familyLabel: 'Certificate in Food Technology (1 year)',                     type: 'certificate', minYear: 1, maxYear: 1, school: 'School of Industrial Technology' },
+
+  // ── School of Information Technology ─────────────────────────────────────────
+  // 1st-year rule: ACT (associate, 2yr) exists → suppress BSIT bachelor for yr 1
+  // BSIT family — 2 specializations share one dropdown entry
+  { value: 'BSIT-AP', family: 'BSIT', familyLabel: 'Bachelor of Science in Information Technology (BSIT)',    type: 'bachelor', minYear: 1, maxYear: 4, school: 'School of Information Technology', major: 'Specialization in Application Programming' },
+  { value: 'BSIT-DD', family: 'BSIT', familyLabel: 'Bachelor of Science in Information Technology (BSIT)',    type: 'bachelor', minYear: 1, maxYear: 4, school: 'School of Information Technology', major: 'Specialization in Digital Design' },
+  { value: 'ACT',     family: 'ACT',  familyLabel: 'Associate in Computer Technology (2 Years)',               type: 'associate',minYear: 1, maxYear: 2, school: 'School of Information Technology' },
+
+  // ── School of Accountancy and Business Management ─────────────────────────────
+  // No non-degree programs → all shown for yr 1+
+  { value: 'BSAcc', family: 'BSAcc', familyLabel: 'Bachelor of Science in Accountancy',                        type: 'bachelor', minYear: 1, maxYear: 5, school: 'School of Accountancy and Business Management' },
+  { value: 'BSHM',  family: 'BSHM',  familyLabel: 'Bachelor of Science in Hospitality Management',            type: 'bachelor', minYear: 1, maxYear: 4, school: 'School of Accountancy and Business Management' },
+  { value: 'BSTM',  family: 'BSTM',  familyLabel: 'Bachelor of Science in Tourism Management',                type: 'bachelor', minYear: 1, maxYear: 4, school: 'School of Accountancy and Business Management' },
+
+  // ── College of Law ────────────────────────────────────────────────────────────
+  // Postgraduate — shown for all year levels (no non-degree to suppress it)
+  { value: 'JD', family: 'JD', familyLabel: 'Juris Doctor (Online)',                                           type: 'postgrad', minYear: 1, maxYear: 4, school: 'College of Law' },
+];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+/** Return the catalog entry matching a specific value code. */
+function ascotByValue(val) {
+  return ASCOT_COURSES.find(function(c) { return c.value === val; }) || null;
+}
+/** Return all catalog entries belonging to a family. */
+function ascotFamily(familyKey) {
+  return ASCOT_COURSES.filter(function(c) { return c.family === familyKey; });
+}
+
+// ── Year Level → Course cascade ───────────────────────────────────────────────
+//
+// Filtering rules (applied in order):
+//   1. Year-range  : keep entries where minYear ≤ selectedYear ≤ maxYear
+//   2. 1st-year    : per school, if ANY non-degree entries (diploma/associate/
+//                    certificate) survived step 1, remove all bachelor/postgrad
+//                    entries for that school.  Schools with ONLY bachelor entries
+//                    keep those entries.
+//   3. Dedup       : show ONE <option> per family (first occurrence wins).
+//
+function onYearLevelChange() {
+  var yearSel   = $('reg-yearlevel');
+  var courseSel = $('reg-course');
+  var specRow   = $('specialization-row');
+  var specSel   = $('reg-specialization');
+
+  var yearVal = yearSel ? parseInt(yearSel.value, 10) : 0;
+
+  // Reset downstream fields
+  if (courseSel) {
+    courseSel.innerHTML = '<option value="">' +
+      (yearVal ? '\u2014 Select Program / Course \u2014' : '\u2014 Select Year Level first \u2014') + '</option>';
+    courseSel.disabled = !yearVal;
+  }
+  if (specRow) specRow.classList.add('hidden');
+  if (specSel) specSel.innerHTML = '<option value="">\u2014 Select Major / Specialization \u2014</option>';
+
+  if (!yearVal) {
+    console.log('[ASCOT] Year level cleared — cascades reset');
+    return;
+  }
+
+  // ── Step 1: year-range filter ─────────────────────────────────────────────
+  // Keep only programs whose duration covers the selected year.
+  var inRange = ASCOT_COURSES.filter(function(c) {
+    return yearVal >= c.minYear && yearVal <= c.maxYear;
+  });
+
+  // ── Step 2: lowest-tier non-degree rule (applies to ALL year levels) ───────
+  //
+  // For each school, find all non-degree programs (diploma / associate /
+  // certificate) that survived step 1.  If any exist:
+  //   a) Suppress ALL bachelor / postgrad entries for that school.
+  //   b) Among the surviving non-degree entries, keep ONLY those whose maxYear
+  //      equals the SMALLEST maxYear in that school — i.e. the shortest programs
+  //      still active at this year level.
+  //
+  // This produces the correct tier per school per year:
+  //   Yr 1  Industrial Tech → certificates only   (maxYear 1 is the minimum)
+  //   Yr 2  Industrial Tech → associates only     (certs done; maxYear 2 is min)
+  //   Yr 3  Industrial Tech → diplomas only       (assocs done; maxYear 3 is min)
+  //   Yr 4  Industrial Tech → BIT bachelor        (all non-degree done)
+  //   Yr 1  Forestry        → DFT diploma         (only non-degree option)
+  //   Yr 3  Forestry        → BSF + BSES          (DFT done at yr 2)
+  //
+  var nonDegreeTypes = { certificate: true, associate: true, diploma: true };
+
+  // Per school: track the lowest maxYear among its surviving non-degree programs.
+  // undefined → school has no non-degree programs in range (bachelor-only school).
+  var schoolLowestTierMax = {};
+  inRange.forEach(function(c) {
+    if (!nonDegreeTypes[c.type]) return;
+    if (schoolLowestTierMax[c.school] === undefined ||
+        c.maxYear < schoolLowestTierMax[c.school]) {
+      schoolLowestTierMax[c.school] = c.maxYear;
+    }
+  });
+
+  var visible = inRange.filter(function(c) {
+    var lowestMax = schoolLowestTierMax[c.school];
+    if (lowestMax !== undefined) {
+      // School still has non-degree options at this year level:
+      //   a) drop all degree/postgrad entries
+      if (!nonDegreeTypes[c.type]) return false;
+      //   b) keep only the lowest-tier non-degree entries
+      return c.maxYear === lowestMax;
+    }
+    return true; // bachelor-only school — keep all
+  });
+
+  var suppressed = inRange.length - visible.length;
+  if (suppressed > 0) {
+    console.log('[ASCOT] Year ' + yearVal + ': suppressed ' + suppressed +
+      ' entries (degree programs + higher-tier non-degree hidden while lower-tier exists)');
+  }
+
+  // ── Step 3: deduplicate by family ─────────────────────────────────────────
+  var seenFamilies = {};
+  var bySchool     = {};
+  visible.forEach(function(c) {
+    if (seenFamilies[c.family]) return;
+    seenFamilies[c.family] = true;
+    if (!bySchool[c.school]) bySchool[c.school] = [];
+    bySchool[c.school].push(c);
+  });
+
+  // ── Build <optgroup> elements ──────────────────────────────────────────────
+  Object.keys(bySchool).sort().forEach(function(school) {
+    var og = document.createElement('optgroup');
+    og.label = school;
+    bySchool[school].forEach(function(c) {
+      var opt         = document.createElement('option');
+      opt.value       = c.family;      // family key → specific code via specialization
+      opt.textContent = c.familyLabel;
+      og.appendChild(opt);
+    });
+    if (courseSel) courseSel.appendChild(og);
+  });
+
+  var totalShown = Object.keys(seenFamilies).length;
+  console.log('[ASCOT] Year ' + yearVal + ' → ' + visible.length +
+    ' programs visible → ' + totalShown + ' unique course entries in dropdown');
+}
+
+// ── Course → Specialization cascade ──────────────────────────────────────────
+//
+// reg-course value = family key (e.g. "BSIT", "BIT", "BSEd").
+// If the family has members with a `major` field → show Specialization dropdown.
+// The reg-specialization value = specific track code (e.g. "BSIT-AP") sent to
+// the backend.  For single-track families, family key === value code.
+//
+function onCourseChange() {
+  var courseSel = $('reg-course');
+  var specRow   = $('specialization-row');
+  var specSel   = $('reg-specialization');
+
+  if (!specRow || !specSel) return;
+
+  var familyKey = courseSel ? courseSel.value : '';
+
+  // Reset specialization
+  specSel.innerHTML = '<option value="">\u2014 Select Major / Specialization \u2014</option>';
+
+  if (!familyKey) {
+    specRow.classList.add('hidden');
+    return;
+  }
+
+  // Find all members of this family that carry a major/specialization
+  var members = ASCOT_COURSES.filter(function(c) {
+    return c.family === familyKey && c.major;
+  });
+
+  if (members.length > 0) {
+    members.forEach(function(c) {
+      var opt       = document.createElement('option');
+      opt.value     = c.value;   // specific code sent to backend
+      opt.textContent = c.major;
+      specSel.appendChild(opt);
+    });
+    specRow.classList.remove('hidden');
+    console.log('[ASCOT] Family "' + familyKey + '" → ' +
+      members.length + ' specialization(s) shown');
+  } else {
+    // No specialization — single-track program
+    specRow.classList.add('hidden');
+    console.log('[ASCOT] Family "' + familyKey + '" → single-track (no specialization)');
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// LIVE SELFIE — Step 4 camera capture
+// ═══════════════════════════════════════════════════
+var _selfieStream = null;
+
+function setStep4Mode(mode) {
+  // mode: 'upload' | 'selfie'
+  var btnUpload = $('btn-mode-upload');
+  var btnSelfie = $('btn-mode-selfie');
+  var selfiePanel = $('selfie-panel');
+  var active   = 'flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-blue-600 text-white shadow shadow-blue-200 transition-all';
+  var inactive = 'flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all';
+  if (mode === 'upload') {
+    if (btnUpload)  btnUpload.className  = active;
+    if (btnSelfie)  btnSelfie.className  = inactive;
+    if (selfiePanel) selfiePanel.classList.add('hidden');
+    stopSelfieCamera();
+  } else {
+    if (btnUpload)  btnUpload.className  = inactive;
+    if (btnSelfie)  btnSelfie.className  = active;
+    if (selfiePanel) selfiePanel.classList.remove('hidden');
+  }
+}
+
+async function startSelfieCamera() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showStepError(4, 'Camera is not supported in this browser. Please upload a photo instead.');
+    setStep4Mode('upload');
+    return;
+  }
+  try {
+    _selfieStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    var feed = $('selfie-feed');
+    if (feed) feed.srcObject = _selfieStream;
+    var snapBtn = $('selfie-snap-btn');
+    if (snapBtn) snapBtn.disabled = false;
+    console.log('[Selfie] Camera stream started');
+  } catch(err) {
+    var msg = (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')
+      ? 'Camera permission denied. Allow camera access in browser settings or upload a photo instead.'
+      : 'Camera unavailable on this device. Please upload a photo instead.';
+    showStepError(4, msg);
+    setStep4Mode('upload');
+    console.warn('[Selfie] Camera error:', err.name, err.message);
+  }
+}
+
+function stopSelfieCamera() {
+  if (_selfieStream) {
+    _selfieStream.getTracks().forEach(function(t){ t.stop(); });
+    _selfieStream = null;
+    console.log('[Selfie] Camera stream stopped');
+  }
+  var feed = $('selfie-feed');
+  if (feed) feed.srcObject = null;
+}
+
+function captureSelfie() {
+  var video  = $('selfie-feed');
+  var canvas = $('selfie-canvas');
+  if (!video || !canvas) { console.error('[Selfie] Missing feed or canvas'); return; }
+  if (!video.videoWidth)  { showStepError(4, 'Camera is not ready yet. Please wait a moment.'); return; }
+
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  var dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+
+  capturedPhotoData = dataUrl;
+  avatarFileRef = null;
+
+  // Show selfie preview
+  var selfiePreview = $('selfie-preview');
+  var selfiePreviewImg = $('selfie-preview-img');
+  if (selfiePreview && selfiePreviewImg) {
+    selfiePreviewImg.src = dataUrl;
+    selfiePreview.classList.remove('hidden');
+  }
+
+  // Feed it into the crop viewfinder system
+  var fakeEvent = { target: { files: [] } };
+  var bytes = Math.round((dataUrl.length * 3) / 4);
+  var fakeFile = null;
+  try {
+    var parts   = dataUrl.split(',');
+    var mime    = (parts[0].match(/:(.*?);/) || [])[1] || 'image/jpeg';
+    var bStr    = atob(parts[1]);
+    var ab      = new Uint8Array(bStr.length);
+    for (var i = 0; i < bStr.length; i++) ab[i] = bStr.charCodeAt(i);
+    fakeFile = new File([new Blob([ab], { type: mime })], 'selfie.jpg', { type: mime });
+  } catch(e) { /* old browser fallback — no File object, use raw dataUrl */ }
+
+  // Initialize viewfinder with the selfie
+  var img = new Image();
+  img.onload = function() {
+    var avFile = $('av-file');
+    if (avFile) {
+      try { var dt = new DataTransfer(); if(fakeFile){ dt.items.add(fakeFile); avFile.files = dt.files; } } catch(e) {}
+    }
+    previewAvatarViewfinder({ target: { result: dataUrl, files: fakeFile ? [fakeFile] : [] } }, true);
+  };
+  img.src = dataUrl;
+
+  stopSelfieCamera();
+  setStep4Mode('upload'); // switch to upload mode to show the viewfinder
+
+  var bytes2 = Math.round((dataUrl.length * 3) / 4);
+  console.log('[Selfie] Captured — ' + formatBytes(bytes2));
+  hideStepError(4);
+  showToast('Selfie captured! Adjust the crop frame if needed.', 'success');
+}
+
+function doModeUpload() {
+  stopSelfieCamera();
+  setStep4Mode('upload');
+  var inp = $('av-file');
+  if (inp) inp.click();
+}
+
+function doModeSelfie() {
+  setStep4Mode('selfie');
+  startSelfieCamera();
 }
 
 document.addEventListener('DOMContentLoaded', async function(){

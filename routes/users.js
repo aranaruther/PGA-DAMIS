@@ -16,7 +16,7 @@ const express = require('express');
 const router  = express.Router();
 
 const { requireAuth } = require('../middleware/auth');
-const { uploadAvatar, uploadCover, uploadIdDocs } = require('../middleware/upload');
+const { uploadAvatar, uploadCover, uploadIdDocs, multerUpload, toCloudinary, resizeImage, hasCloudinary } = require('../middleware/upload');
 const {
   findUserById, findUserByUsername, updateUser, getUserPosts,
   toggleFollow, isFollowing, getFollowerCount, getFollowingCount,
@@ -27,7 +27,7 @@ const {
   cancelFollowRequest, getPendingFollowRequests, getFollowRequestStatus,
   sendFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend,
   getFriendshipStatus, areFriends, getPendingFriendRequests, getOutgoingFriendRequests, getFriendCount,
-  db, setBillComment,
+  db, setBillComment, setBillReceipt,
   getReputationScore, getMyRepVote, setRepVote,
   createUserReport,
   createMaintenanceRequest, getMaintenanceRequests,
@@ -323,16 +323,21 @@ router.get('/api/users/me/dormitory', requireAuth, (req, res) => {
       'WHERE ba.user_id = ?'
     ).get(req.user.id);
 
-    // Full billing history with paid_at and notes
+    // Full billing history with paid_at, notes, and receipt
     const billing = db.prepare(
-      'SELECT id, status, month, amount, paid_at, notes, user_comment FROM dorm_billing WHERE user_id=? ORDER BY month DESC LIMIT 12'
+      'SELECT id, status, month, amount, paid_at, notes, user_comment, receipt_url FROM dorm_billing WHERE user_id=? ORDER BY month DESC LIMIT 12'
     ).all(req.user.id);
 
     const hasBills = billing.length > 0;
     const unpaidCount = billing.filter(b => b.status === 'unpaid' || b.status === 'overdue').length;
 
+    // GCash payment info set by admin
+    const { getSetting } = require('../utils/db');
+    const gcashQr     = getSetting('gcash_qr_url', '');
+    const gcashNumber = getSetting('gcash_number', '');
+
     if (!assignment) {
-      return res.json({ assigned: false, billing, hasBills, unpaidCount });
+      return res.json({ assigned: false, billing, hasBills, unpaidCount, gcashQr, gcashNumber });
     }
     res.json({
       assigned: true,
@@ -344,6 +349,8 @@ router.get('/api/users/me/dormitory', requireAuth, (req, res) => {
       billing,
       hasBills,
       unpaidCount,
+      gcashQr,
+      gcashNumber,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -433,10 +440,18 @@ router.post('/api/users/:username/report', requireAuth, (req, res) => {
 // ── Maintenance Requests (user side) ──────────────────────────────────────────
 
 // Submit a new maintenance request
-router.post('/api/maintenance/requests', requireAuth, (req, res) => {
+// ── Submit a maintenance request (optionally with a photo) ───────────────────
+router.post('/api/maintenance/requests', requireAuth, multerUpload.single('image'), async (req, res) => {
   const { category, title, description, location, priority } = req.body;
   if (!title?.trim() || !description?.trim()) return res.status(400).json({ error: 'Title and description are required.' });
   try {
+    let imageUrl = '';
+    if (req.file) {
+      const buf = await resizeImage(req.file.buffer, { width: 1200, quality: 80 });
+      imageUrl = hasCloudinary
+        ? (await toCloudinary(buf, 'damis/maintenance')).secure_url
+        : `data:${req.file.mimetype};base64,${buf.toString('base64')}`;
+    }
     const id = createMaintenanceRequest({
       userId: req.user.id,
       category: category || 'general',
@@ -444,12 +459,39 @@ router.post('/api/maintenance/requests', requireAuth, (req, res) => {
       description: description.trim(),
       location: location?.trim() || '',
       priority: priority || 'normal',
+      imageUrl,
     });
-    log.info(`Maintenance request submitted by @${req.user.username}: "${title.trim()}" [${category}]`);
+    log.info(`Maintenance request submitted by @${req.user.username}: "${title.trim()}" [${category}]${imageUrl ? ' +photo' : ''}`);
     res.json({ success: true, id });
   } catch (e) {
     log.error('createMaintenanceRequest error:', e.message);
     res.status(500).json({ error: 'Failed to submit request.' });
+  }
+});
+
+// ── Upload GCash receipt for a billing record ────────────────────────────────
+// POST /api/billing/:billId/receipt   multipart: image field "receipt"
+router.post('/api/billing/:billId/receipt', requireAuth, multerUpload.single('receipt'), async (req, res) => {
+  const { billId } = req.params;
+  if (!req.file) return res.status(400).json({ error: 'No receipt image uploaded.' });
+  try {
+    // Verify the bill belongs to this user
+    const bill = require('../utils/db').db.prepare(
+      'SELECT id, user_id, status FROM dorm_billing WHERE id=? AND user_id=?'
+    ).get(billId, req.user.id);
+    if (!bill) return res.status(404).json({ error: 'Billing record not found.' });
+
+    const buf = await resizeImage(req.file.buffer, { width: 1600, quality: 85 });
+    const receiptUrl = hasCloudinary
+      ? (await toCloudinary(buf, 'damis/receipts')).secure_url
+      : `data:${req.file.mimetype};base64,${buf.toString('base64')}`;
+
+    setBillReceipt(billId, req.user.id, receiptUrl);
+    log.info(`[billing] Receipt uploaded by @${req.user.username} for bill ${billId}`);
+    res.json({ success: true, receiptUrl });
+  } catch (e) {
+    log.error('setBillReceipt error:', e.message);
+    res.status(500).json({ error: 'Failed to upload receipt.' });
   }
 });
 

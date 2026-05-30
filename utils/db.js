@@ -360,6 +360,7 @@ try { db.prepare(`ALTER TABLE rejected_registrations ADD COLUMN avatar_face_y   
 try { db.prepare(`ALTER TABLE rejected_registrations ADD COLUMN father_info       TEXT DEFAULT ''`).run(); } catch (_) {}
 try { db.prepare(`ALTER TABLE rejected_registrations ADD COLUMN mother_info       TEXT DEFAULT ''`).run(); } catch (_) {}
 try { db.prepare(`ALTER TABLE rejected_registrations ADD COLUMN monthly_income    TEXT DEFAULT ''`).run(); } catch (_) {}
+try { db.prepare(`ALTER TABLE rejected_registrations ADD COLUMN specialization    TEXT DEFAULT ''`).run(); } catch (_) {}
 try { db.prepare(`ALTER TABLE posts ADD COLUMN moderated_by TEXT DEFAULT NULL`).run(); } catch (_) {}    // 'ai' | 'admin' | NULL
 try { db.prepare(`ALTER TABLE posts ADD COLUMN ai_reviewed_at TEXT DEFAULT NULL`).run(); } catch (_) {}  // set when AI reviews (even if no action taken)
 try { db.prepare(`ALTER TABLE comments ADD COLUMN parent_id TEXT DEFAULT NULL`).run(); } catch (_) {}
@@ -431,6 +432,7 @@ try { db.prepare(`ALTER TABLE users ADD COLUMN mother_info        TEXT DEFAULT '
 try { db.prepare(`ALTER TABLE users ADD COLUMN monthly_income     TEXT DEFAULT ''`).run(); } catch (_) {}
 try { db.prepare(`ALTER TABLE users ADD COLUMN avatar_face_x      INTEGER DEFAULT 50`).run(); } catch (_) {}
 try { db.prepare(`ALTER TABLE users ADD COLUMN avatar_face_y      INTEGER DEFAULT 50`).run(); } catch (_) {}
+try { db.prepare(`ALTER TABLE users ADD COLUMN specialization     TEXT DEFAULT ''`).run(); } catch (_) {}
 // ── PGA-DAMIS cert doc columns on id_verification_requests ────────────
 try { db.prepare(`ALTER TABLE id_verification_requests ADD COLUMN cert_residency_url   TEXT DEFAULT ''`).run(); } catch (_) {}
 try { db.prepare(`ALTER TABLE id_verification_requests ADD COLUMN cert_low_income_url  TEXT DEFAULT ''`).run(); } catch (_) {}
@@ -519,9 +521,9 @@ function createUser(userData) {
     INSERT INTO users (id, google_id, email, password, first_name, middle_name, last_name,
       suffix, username, birthday, sex, civil_status, phone, bio, location,
       present_address, permanent_address, school_name, course, year_level, school_address,
-      father_info, mother_info, monthly_income,
+      father_info, mother_info, monthly_income, specialization,
       avatar, avatar_face_x, avatar_face_y, email_verified, id_verified, auth_provider, role, account_status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     userData.googleId || null,
@@ -547,6 +549,7 @@ function createUser(userData) {
     userData.fatherInfo || '',
     userData.motherInfo || '',
     userData.monthlyIncome || '',
+    userData.specialization || '',
     userData.avatar || '',
     userData.avatarFaceX ?? 50,
     userData.avatarFaceY ?? 50,
@@ -617,6 +620,7 @@ function dbRowToUser(row) {
     monthlyIncome:    row.monthly_income    || '',
     avatarFaceX:      row.avatar_face_x     ?? 50,
     avatarFaceY:      row.avatar_face_y     ?? 50,
+    specialization:   row.specialization    || '',
   };
 }
 
@@ -1043,20 +1047,20 @@ function archiveRejectedRegistration({ user, idDocs, reason, rejectedBy }) {
       (id, user_id, first_name, middle_name, last_name, suffix, username, email, phone,
        birthday, sex, bio, location, avatar, auth_provider,
        civil_status, present_address, permanent_address,
-       school_name, school_address, year_level, course,
+       school_name, school_address, year_level, course, specialization,
        father_info, mother_info, monthly_income,
        id_front_url, id_back_url, selfie_url, id_type,
        cert_residency_url, cert_low_income_url, cert_enrollment_url,
        rejection_reason, rejected_by, original_created_at, password_hash,
        avatar_face_x, avatar_face_y)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
     id, user.id, user.firstName, user.middleName||'', user.lastName, user.suffix||'',
     user.username, user.email, user.phone||'', user.birthday||'', user.sex||'',
     user.bio||'', user.location||'', user.avatar||'', user.authProvider||'local',
     // ── Full registration fields ──
     user.civilStatus||'', user.presentAddress||'', user.permanentAddress||'',
-    user.schoolName||'', user.schoolAddress||'', user.yearLevel||'', user.course||'',
+    user.schoolName||'', user.schoolAddress||'', user.yearLevel||'', user.course||'', user.specialization||'',
     user.fatherInfo||'', user.motherInfo||'', user.monthlyIncome||'',
     // ── Documents ──
     idDocs?.id_front_url||'', idDocs?.id_back_url||'', idDocs?.selfie_url||'', idDocs?.id_type||'',
@@ -1563,7 +1567,7 @@ function getPendingAccounts() {
            u.username, u.email, u.phone, u.avatar,
            u.birthday, u.sex, u.civil_status, u.bio, u.location,
            u.present_address, u.permanent_address,
-           u.school_name, u.course, u.year_level, u.school_address,
+           u.school_name, u.course, u.year_level, u.school_address, u.specialization,
            u.father_info, u.mother_info, u.monthly_income,
            u.created_at, u.auth_provider,
            u.avatar_face_x, u.avatar_face_y,
@@ -1849,11 +1853,19 @@ try {
   db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS uniq_utility_month_type ON utility_bills(month, type)`).run();
 } catch (_) {}
 
-// ── Maintenance Request Functions ────────────────────────────────────────────
-function createMaintenanceRequest({ userId, category, title, description, location, priority }) {
+// ── v2 feature migrations ─────────────────────────────────────────────────────
+// maintenance image attachment
+try { db.prepare(`ALTER TABLE maintenance_requests ADD COLUMN image_url TEXT DEFAULT ''`).run(); } catch (_) {}
+// GCash receipt attached by resident to a billing record
+try { db.prepare(`ALTER TABLE dorm_billing ADD COLUMN receipt_url TEXT DEFAULT ''`).run(); } catch (_) {}
+// Utility bill scan / proof-of-billing image
+try { db.prepare(`ALTER TABLE utility_bills ADD COLUMN image_url TEXT DEFAULT ''`).run(); } catch (_) {}
+
+
+function createMaintenanceRequest({ userId, category, title, description, location, priority, imageUrl = '' }) {
   const id = genId();
-  db.prepare(`INSERT INTO maintenance_requests (id, user_id, category, title, description, location, priority)
-    VALUES (?, ?, ?, ?, ?, ?, ?)`).run(id, userId, category || 'general', title, description, location || '', priority || 'normal');
+  db.prepare(`INSERT INTO maintenance_requests (id, user_id, category, title, description, location, priority, image_url)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(id, userId, category || 'general', title, description, location || '', priority || 'normal', imageUrl || '');
   return id;
 }
 
@@ -1894,15 +1906,54 @@ function getMaintenanceStats() {
 }
 
 // ── Utility Bill Functions ─────────────────────────────────────────────────────
-function upsertUtilityBill({ month, type, amount, unitUsed, note }) {
+/**
+ * Insert or update a utility bill row.
+ *
+ * @param {object}  opts
+ * @param {string}  opts.month             - YYYY-MM
+ * @param {string}  opts.type              - 'electricity' | 'water'
+ * @param {number}  opts.amount
+ * @param {number}  [opts.unitUsed]
+ * @param {string}  [opts.note]
+ * @param {string}  [opts.imageUrl='']    - New image URL; empty string = no change (keeps existing)
+ * @param {boolean} [opts.removeImage=false] - When true, explicitly sets image_url to ''.
+ *   Without this flag an empty imageUrl is treated as "no change" (the CASE WHEN guard)
+ *   so a normal save-without-image doesn't accidentally wipe a stored bill photo.
+ */
+function upsertUtilityBill({ month, type, amount, unitUsed, note, imageUrl = '', removeImage = false }) {
   const id = genId();
-  db.prepare(`INSERT INTO utility_bills (id, month, type, amount, unit_used, note)
-    VALUES (?, ?, ?, ?, ?, ?)
-    ON CONFLICT(month, type) DO UPDATE SET
-      amount = excluded.amount,
-      unit_used = excluded.unit_used,
-      note = excluded.note,
-      updated_at = datetime('now')`).run(id, month, type, amount, unitUsed ?? null, note ?? null);
+  if (removeImage) {
+    // Explicit removal — bypass the preserve-image guard, always write empty string.
+    db.prepare(`INSERT INTO utility_bills (id, month, type, amount, unit_used, note, image_url)
+      VALUES (?, ?, ?, ?, ?, ?, '')
+      ON CONFLICT(month, type) DO UPDATE SET
+        amount     = excluded.amount,
+        unit_used  = excluded.unit_used,
+        note       = excluded.note,
+        image_url  = '',
+        updated_at = datetime('now')`).run(id, month, type, amount, unitUsed ?? null, note ?? null);
+  } else {
+    // Normal upsert — keep the existing image when no new image is provided.
+    db.prepare(`INSERT INTO utility_bills (id, month, type, amount, unit_used, note, image_url)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(month, type) DO UPDATE SET
+        amount     = excluded.amount,
+        unit_used  = excluded.unit_used,
+        note       = excluded.note,
+        image_url  = CASE WHEN excluded.image_url = '' THEN image_url ELSE excluded.image_url END,
+        updated_at = datetime('now')`).run(id, month, type, amount, unitUsed ?? null, note ?? null, imageUrl || '');
+  }
+}
+
+/** Set GCash / payment receipt uploaded by a resident against their billing record. */
+function setBillReceipt(billId, userId, receiptUrl) {
+  return db.prepare(`UPDATE dorm_billing SET receipt_url=? WHERE id=? AND user_id=?`)
+    .run(receiptUrl, billId, userId);
+}
+
+/** Admin: clear a billing receipt (e.g. false upload). */
+function clearBillReceipt(billId) {
+  return db.prepare(`UPDATE dorm_billing SET receipt_url='' WHERE id=?`).run(billId);
 }
 
 function getUtilityBills({ month, type, from, to } = {}) {
@@ -1979,4 +2030,6 @@ module.exports = {
   createMaintenanceRequest, getMaintenanceRequests, updateMaintenanceRequest, getMaintenanceStats,
   // Utility Bills
   upsertUtilityBill, getUtilityBills, getUtilityTrend,
+  // GCash / billing receipts
+  setBillReceipt, clearBillReceipt,
 };
