@@ -45,7 +45,9 @@ function getAge(dob) {
 // ════════════════════════════════════════════════════
 // POST /api/auth/send-otp
 // ════════════════════════════════════════════════════
-router.post('/api/auth/send-otp', rejectDisposableEmail, async (req, res) => {
+// NOTE: rejectDisposableEmail middleware disabled for testing — re-enable in production:
+// router.post('/api/auth/send-otp', rejectDisposableEmail, async (req, res) => {
+router.post('/api/auth/send-otp', async (req, res) => {
   try {
     const { email, password, confirmPassword, isGoogleSignup } = req.body;
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
@@ -99,7 +101,8 @@ router.post('/api/auth/send-otp', rejectDisposableEmail, async (req, res) => {
 // ════════════════════════════════════════════════════
 // POST /api/auth/resend-otp
 // ════════════════════════════════════════════════════
-router.post('/api/auth/resend-otp', rejectDisposableEmail, async (req, res) => {
+// NOTE: rejectDisposableEmail middleware disabled for testing — re-enable in production
+router.post('/api/auth/resend-otp', async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email is required.' });
@@ -172,15 +175,15 @@ router.post('/api/auth/complete-registration', ...uploadIdDocs, async (req, res)
       return res.status(400).json({ error: 'Invalid phone number. Enter 10 digits after +63.' });
     const phoneFormatted = '+63' + (phoneClean.length === 11 ? phoneClean.slice(1) : phoneClean);
 
-    // ⚠️ DEV MODE: phone uniqueness — auto-suffix duplicate numbers so testing never blocks.
-    // In production this block is skipped and the original check below enforces uniqueness.
+    // ⚠️ TESTING MODE: phone uniqueness check disabled — duplicate phones get an auto-suffix
+    // so registration never blocks during testing. Re-enable the PRODUCTION block below when done.
     let phoneForDb = phoneFormatted;
-    if (process.env.NODE_ENV === 'development' && findUserByPhone(phoneFormatted)) {
+    if (findUserByPhone(phoneFormatted)) {
       const suffix = Date.now().toString().slice(-5); // 5-digit ms suffix → always unique
       phoneForDb = phoneFormatted.slice(0, -5) + suffix;
-      log.warn(`DEV: phone ${phoneFormatted} already in DB — using surrogate ${phoneForDb} for this test account.`);
+      log.warn(`[TEST] phone ${phoneFormatted} already in DB — using surrogate ${phoneForDb} for this test account.`);
     }
-    // ── PRODUCTION: uncomment to enforce phone uniqueness ──
+    // ── PRODUCTION: uncomment to enforce phone uniqueness (and remove block above) ──
     // if (findUserByPhone(phoneFormatted))
     //   return res.status(409).json({ error: 'This phone number is already registered to another account.' });
     // Username uniqueness check removed

@@ -1577,7 +1577,7 @@ function getPendingAccounts() {
     LEFT JOIN id_verification_requests ivr ON ivr.user_id = u.id
       AND ivr.id = (SELECT id FROM id_verification_requests WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1)
     WHERE u.account_status = 'pending'
-    ORDER BY u.created_at DESC
+    ORDER BY u.created_at ASC
   `).all();
 }
 

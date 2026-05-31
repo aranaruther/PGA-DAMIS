@@ -349,6 +349,25 @@
         <i class="fa-solid fa-user-xmark mr-1.5"></i>Rejected
       </button>
     </div>
+    <!-- Search + Sort controls -->
+    <div class="flex flex-wrap items-center gap-2 mb-4">
+      <div class="flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 gap-2 shadow-sm flex-1 min-w-[180px] max-w-xs">
+        <i class="fa-solid fa-magnifying-glass text-slate-400 text-sm"></i>
+        <input id="reg-search" type="text" placeholder="Search name, email, municipality…"
+          class="bg-transparent text-sm outline-none text-slate-800 dark:text-slate-200 placeholder-slate-400 w-full"
+          oninput="applyRegFilters()"/>
+      </div>
+      <select id="reg-sort" onchange="applyRegFilters()"
+        class="text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none text-slate-700 dark:text-slate-200 shadow-sm">
+        <option value="dicadi-oldest">DiCaDi Area first, then oldest</option>
+        <option value="oldest">Oldest first (default)</option>
+        <option value="newest">Newest first</option>
+        <option value="surname">Surname A–Z</option>
+        <option value="yearlevel">Year Level (low→high)</option>
+        <option value="municipality">Municipality A–Z</option>
+      </select>
+      <span id="reg-count" class="text-xs text-slate-400 ml-1"></span>
+    </div>
     <div id="registrations-list" class="space-y-4"></div>
   </div>
 
@@ -438,22 +457,30 @@
 
     <!-- ── Role filter pills ── -->
     <div class="flex items-center gap-2 mb-4">
-      <button id="um-tab-all"      onclick="setUserRoleFilter('all')"     class="um-role-tab active text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors border-brand-500 bg-brand-50 dark:bg-brand-950/40 text-brand-700 dark:text-brand-300">All</button>
-      <button id="um-tab-user"     onclick="setUserRoleFilter('user')"    class="um-role-tab text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors border-slate-200 dark:border-slate-700 text-slate-500 hover:border-brand-300">Residents only</button>
-      <button id="um-tab-admin"    onclick="setUserRoleFilter('admin')"   class="um-role-tab text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors border-slate-200 dark:border-slate-700 text-slate-500 hover:border-purple-300">Admins only</button>
+      <button id="um-tab-user"  onclick="setUserRoleFilter('user')"  class="um-role-tab active text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors border-brand-500 bg-brand-50 dark:bg-brand-950/40 text-brand-700 dark:text-brand-300">Residents</button>
+      <button id="um-tab-admin" onclick="setUserRoleFilter('admin')" class="um-role-tab text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors border-slate-200 dark:border-slate-700 text-slate-500 hover:border-purple-300">Admins</button>
       <span class="ml-auto text-xs text-slate-400" id="um-filter-count"></span>
     </div>
     <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-visible">
       <div class="overflow-x-auto" style="overflow-y:visible">
         <table class="w-full text-sm" style="overflow:visible">
           <thead><tr class="text-left text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider sticky top-0 bg-white dark:bg-slate-900 z-10 shadow-sm">
-            <th class="px-4 py-3 font-semibold">Resident</th>
-            <th class="px-4 py-3 font-semibold">Email</th>
-            <th class="px-4 py-3 font-semibold">Year Level</th>
-            <th class="px-4 py-3 font-semibold">Role</th>
-            <th class="px-4 py-3 font-semibold">Reputation</th>
-            <th class="px-4 py-3 font-semibold">Reports</th>
-            <th class="px-4 py-3 font-semibold">Joined</th>
+            <th class="px-4 py-3 font-semibold cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200 whitespace-nowrap" onclick="sortUsers('surname')">
+              Resident <i id="sort-icon-surname" class="fa-solid fa-sort text-slate-300 ml-1"></i></th>
+            
+            <th class="px-4 py-3 font-semibold cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200 whitespace-nowrap" onclick="sortUsers('room')">
+              Room <i id="sort-icon-room" class="fa-solid fa-sort text-slate-300 ml-1"></i></th>
+            <th class="px-4 py-3 font-semibold cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200 whitespace-nowrap" onclick="sortUsers('municipality')">
+              Municipality <i id="sort-icon-municipality" class="fa-solid fa-sort text-slate-300 ml-1"></i></th>
+            <th class="px-4 py-3 font-semibold cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200 whitespace-nowrap" onclick="sortUsers('yearlevel')">
+              Year Level <i id="sort-icon-yearlevel" class="fa-solid fa-sort text-slate-300 ml-1"></i></th>
+            
+            <th class="px-4 py-3 font-semibold cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200 whitespace-nowrap" onclick="sortUsers('reputation')">
+              Reputation <i id="sort-icon-reputation" class="fa-solid fa-sort text-slate-300 ml-1"></i></th>
+            <th class="px-4 py-3 font-semibold cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200 whitespace-nowrap" onclick="sortUsers('reports')">
+              Reports <i id="sort-icon-reports" class="fa-solid fa-sort text-slate-300 ml-1"></i></th>
+            <th class="px-4 py-3 font-semibold cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200 whitespace-nowrap" onclick="sortUsers('joined')">
+              Joined <i id="sort-icon-joined" class="fa-solid fa-sort text-slate-300 ml-1"></i></th>
             <th class="px-4 py-3 font-semibold">Actions</th>
           </tr></thead>
           <tbody id="users-tbody"></tbody>
@@ -733,23 +760,40 @@
         <p class="text-xs text-slate-400 mt-1">Per student/month · click to edit</p>
       </div>
     </div>
-    <!-- Month selector -->
-    <div class="flex items-center gap-3 mb-4">
+    <!-- Month selector + sort controls -->
+    <div class="flex flex-wrap items-center gap-3 mb-4">
       <label class="text-sm font-semibold text-slate-600 dark:text-slate-300">Month:</label>
       <input type="month" id="billing-month" class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm outline-none focus:border-brand-400" onchange="loadBilling()"/>
+      <div class="ml-auto flex items-center gap-2">
+        <i class="fa-solid fa-arrow-down-a-z text-slate-400 text-sm"></i>
+        <select id="billing-sort" onchange="applyBillingSort()"
+          class="text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none text-slate-700 dark:text-slate-200 shadow-sm">
+          <option value="surname">Surname A–Z</option>
+          <option value="surname-desc">Surname Z–A</option>
+          <option value="room">Room (low→high)</option>
+          <option value="room-desc">Room (high→low)</option>
+          <option value="status-unpaid">Unpaid first</option>
+          <option value="status-paid">Paid first</option>
+          <option value="paid-date-desc">Date Paid (newest)</option>
+          <option value="paid-date-asc">Date Paid (oldest)</option>
+          <option value="receipt">With GCash Receipt first</option>
+          <option value="note">With Resident Note first</option>
+        </select>
+        <span id="billing-count" class="text-xs text-slate-400"></span>
+      </div>
     </div>
     <!-- Billing table -->
     <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
       <table class="w-full text-sm">
         <thead>
           <tr class="border-b border-slate-100 dark:border-slate-800">
-            <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Student</th>
-            <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Room / Bed</th>
+            <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-700 whitespace-nowrap select-none" onclick="setBillingSort('surname')">Student <i id="bsort-icon-surname" class="fa-solid fa-sort text-slate-300 ml-1"></i></th>
+            <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-700 whitespace-nowrap select-none" onclick="setBillingSort('room')">Room / Bed <i id="bsort-icon-room" class="fa-solid fa-sort text-slate-300 ml-1"></i></th>
             <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Amount</th>
-            <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-            <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Date Paid</th>
-            <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">GCash Receipt</th>
-            <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Resident Note</th>
+            <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-700 whitespace-nowrap select-none" onclick="setBillingSort('status-unpaid')">Status <i id="bsort-icon-status" class="fa-solid fa-sort text-slate-300 ml-1"></i></th>
+            <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-700 whitespace-nowrap select-none" onclick="setBillingSort('paid-date-desc')">Date Paid <i id="bsort-icon-date" class="fa-solid fa-sort text-slate-300 ml-1"></i></th>
+            <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-700 whitespace-nowrap select-none" onclick="setBillingSort('receipt')" title="Sort: with receipt first">GCash Receipt <i id="bsort-icon-receipt" class="fa-solid fa-sort text-slate-300 ml-1"></i></th>
+            <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-700 whitespace-nowrap select-none" onclick="setBillingSort('note')" title="Sort: with note first">Resident Note <i id="bsort-icon-note" class="fa-solid fa-sort text-slate-300 ml-1"></i></th>
             <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
           </tr>
         </thead>
@@ -2138,37 +2182,22 @@
     setLoading(el);
     const r=await fetch('/api/admin/accounts/pending');
     const d=await r.json();
-    if(!d.accounts?.length){
+    _regAccounts = d.accounts || [];
+    if(!_regAccounts.length){
       el.innerHTML='<div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-12 text-center"><i class="fa-solid fa-user-check text-4xl text-green-400 mb-3 block"></i><p class="font-display font-semibold text-slate-700 dark:text-slate-300">No pending registrations!</p><p class="text-sm text-slate-400 mt-1">All accounts have been reviewed.</p></div>';
+      const countEl = document.getElementById('reg-count');
+      if(countEl) countEl.textContent = '';
       return;
     }
-    // Render collapsed summary rows; click row to expand full card
-    el.innerHTML = '<div class="divide-y divide-slate-100 dark:divide-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">'
-      + d.accounts.map(a => renderRegistrationRow(a)).join('')
-      + '</div>';
-    // Attach expand listeners
-    el.querySelectorAll('[data-reg-toggle]').forEach(btn => {
-      btn.addEventListener('click', function(){
-        const id = this.dataset.regToggle;
-        const detail = document.getElementById('reg-detail-'+id);
-        const icon   = this.querySelector('.expand-icon');
-        const isOpen = !detail.classList.contains('hidden');
-        // Close all others first
-        el.querySelectorAll('[data-reg-detail]').forEach(d2 => { if(d2.id !== 'reg-detail-'+id) d2.classList.add('hidden'); });
-        el.querySelectorAll('.expand-icon').forEach(i2 => { if(i2 !== icon) { i2.classList.remove('rotate-180'); } });
-        detail.classList.toggle('hidden', isOpen);
-        icon.classList.toggle('rotate-180', !isOpen);
-      });
-    });
-    // Lightbox delegation (re-attach after innerHTML)
-    el.querySelectorAll('[data-lightbox-url]').forEach(el2 => {
-      el2.addEventListener('click', () => openLightbox(el2.dataset.lightboxUrl, el2.dataset.lightboxTitle||''));
-    });
+    applyRegFilters();
   }
 
   function renderRegistrationRow(a){
-    const parts = [a.first_name, a.middle_name, a.last_name, a.suffix].filter(Boolean);
-    const fullName = parts.map(escHtml).join(' ');
+    const mi    = (a.middle_name||'').trim();
+    const miStr = mi ? ' ' + mi[0].toUpperCase() + '.' : '';
+    const displayName = a.last_name
+      ? `${escHtml(a.last_name)}, ${escHtml(a.first_name||'')}${escHtml(miStr)}${a.suffix ? ' '+escHtml(a.suffix):''}`
+      : escHtml([a.first_name, a.middle_name, a.last_name, a.suffix].filter(Boolean).join(' '));
     const name = ((a.first_name||'')+' '+(a.last_name||'')).trim();
     // collapsed row thumbnail: face-cropped avatar first (same as expanded hero)
     const selfieUrl = escHtml(a.avatar || a.selfie_url || avatarUrl(a.first_name, a.last_name));
@@ -2184,10 +2213,10 @@
         <img src="${selfieUrl}" onerror="this.src='${avFb}'" class="w-11 h-11 rounded-xl object-cover flex-shrink-0 border border-slate-200 dark:border-slate-700"/>
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
-            <p class="font-bold text-slate-800 dark:text-slate-100 text-sm">${fullName}</p>
+            <p class="font-bold text-slate-800 dark:text-slate-100 text-sm">${displayName}</p>
             ${docBadge}
           </div>
-          <p class="text-xs text-slate-400 truncate mt-0.5">${escHtml(a.email)} &nbsp;·&nbsp; ${escHtml(courseLabel(a.course)||'—')} &nbsp;·&nbsp; ${escHtml(a.year_level||'—')}</p>
+          <p class="text-xs text-slate-400 truncate mt-0.5">${escHtml(a.email)} &nbsp;·&nbsp; ${escHtml(municipalityFrom(a.permanent_address))} &nbsp;·&nbsp; ${escHtml(a.year_level||'—')} &nbsp;·&nbsp; ${escHtml(courseLabel(a.course)||'—')}${(a.specialization && a.specialization!=='(none)') ? ' &nbsp;·&nbsp; <span class="text-brand-500">'+escHtml(a.specialization)+'</span>' : ''}</p>
         </div>
         <span class="text-xs text-slate-400 flex-shrink-0 hidden sm:block">${reltime(a.created_at)}</span>
         <span class="badge badge-pending text-xs px-2 py-0.5 flex-shrink-0">Pending</span>
@@ -2784,26 +2813,347 @@
   // ── ID VERIFICATION ───────────────────────────────
 
   // ── USERS TABLE ───────────────────────────────────
-  let _userRoleFilter = 'all'; // 'all' | 'user' | 'admin'
+  let _userRoleFilter = 'user'; // 'user' | 'admin' — default: Residents tab
+  let _userSortCol = 'surname'; // default: surname A-Z
+  let _userSortDir = 'asc';
 
   function setUserRoleFilter(role) {
     _userRoleFilter = role;
-    // Update pill styles
+    // Update pill styles (user = brand blue, admin = purple)
     document.querySelectorAll('.um-role-tab').forEach(btn => {
       const isActive = btn.id === `um-tab-${role}`;
       btn.classList.toggle('active', isActive);
-      btn.classList.toggle('border-brand-500', isActive && role !== 'admin');
-      btn.classList.toggle('bg-brand-50', isActive && role !== 'admin');
-      btn.classList.toggle('dark:bg-brand-950/40', isActive && role !== 'admin');
-      btn.classList.toggle('text-brand-700', isActive && role !== 'admin');
-      btn.classList.toggle('border-purple-500', isActive && role === 'admin');
-      btn.classList.toggle('bg-purple-50', isActive && role === 'admin');
-      btn.classList.toggle('text-purple-700', isActive && role === 'admin');
-      btn.classList.toggle('border-slate-200', !isActive);
-      btn.classList.toggle('dark:border-slate-700', !isActive);
-      btn.classList.toggle('text-slate-500', !isActive);
+      btn.classList.toggle('border-brand-500',       isActive && role === 'user');
+      btn.classList.toggle('bg-brand-50',            isActive && role === 'user');
+      btn.classList.toggle('dark:bg-brand-950/40',   isActive && role === 'user');
+      btn.classList.toggle('text-brand-700',         isActive && role === 'user');
+      btn.classList.toggle('dark:text-brand-300',    isActive && role === 'user');
+      btn.classList.toggle('border-purple-500',      isActive && role === 'admin');
+      btn.classList.toggle('bg-purple-50',           isActive && role === 'admin');
+      btn.classList.toggle('dark:bg-purple-950/40',  isActive && role === 'admin');
+      btn.classList.toggle('text-purple-700',        isActive && role === 'admin');
+      btn.classList.toggle('dark:text-purple-300',   isActive && role === 'admin');
+      btn.classList.toggle('border-slate-200',       !isActive);
+      btn.classList.toggle('dark:border-slate-700',  !isActive);
+      btn.classList.toggle('text-slate-500',         !isActive);
     });
     filterUsers(document.getElementById('user-filter')?.value || '');
+  }
+
+  function sortUsers(col) {
+    if (_userSortCol === col) {
+      _userSortDir = _userSortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      _userSortCol = col;
+      _userSortDir = 'asc';
+    }
+    // Update sort icons
+    const cols = ['surname','room','municipality','yearlevel','reputation','reports','joined'];
+    cols.forEach(c => {
+      const el = document.getElementById(`sort-icon-${c}`);
+      if (!el) return;
+      el.className = c === _userSortCol
+        ? `fa-solid fa-sort-${_userSortDir === 'asc' ? 'up' : 'down'} text-brand-500 ml-1`
+        : 'fa-solid fa-sort text-slate-300 ml-1';
+    });
+    filterUsers(document.getElementById('user-filter')?.value || '');
+  }
+
+  function _applyUserSort(list) {
+    const YEAR_ORDER = {'1st Year':1,'2nd Year':2,'3rd Year':3,'4th Year':4,'5th Year':5};
+    const dir = _userSortDir === 'asc' ? 1 : -1;
+    return [...list].sort((a, b) => {
+      switch(_userSortCol) {
+        case 'surname':
+          return dir * (a.lastName||'').localeCompare(b.lastName||'', 'en', {sensitivity:'base'});
+        case 'room': {
+          const ra = parseInt(a.roomNumber||0,10), rb = parseInt(b.roomNumber||0,10);
+          return dir * (ra - rb || (a.bedNumber||0) - (b.bedNumber||0));
+        }
+        case 'municipality':
+          return dir * municipalityFrom(a.permanentAddress||a.permanent_address||'')
+            .localeCompare(municipalityFrom(b.permanentAddress||b.permanent_address||''), 'en', {sensitivity:'base'});
+        case 'yearlevel': {
+          const ya = YEAR_ORDER[a.yearLevel||a.year_level||''] ?? 99;
+          const yb = YEAR_ORDER[b.yearLevel||b.year_level||''] ?? 99;
+          return dir * (ya - yb);
+        }
+        case 'reputation':
+          return dir * ((a.reputationScore??0) - (b.reputationScore??0));
+        case 'reports':
+          return dir * ((a.reportCount??0) - (b.reportCount??0));
+        case 'joined':
+          return dir * (new Date(a.createdAt||0) - new Date(b.createdAt||0));
+        default:
+          return 0;
+      }
+    });
+  }
+
+  // ── Address / Municipality helpers ──────────────────────────────────────
+  // Philippine PSGC address format: "Barangay, Municipality, Province, Region, Country"
+  // index [1] = Municipality/City, which is what we want for display + sorting.
+  function municipalityFrom(addr) {
+    if (!addr) return '—';
+    const parts = addr.split(',').map(s => s.trim()).filter(Boolean);
+    let muni = parts.length >= 2 ? parts[1] : parts[0];
+    if (muni) muni = muni.replace(/^City of\s+/i,'').replace(/^Municipality of\s+/i,'').trim();
+    return muni || '—';
+  }
+
+  // DiCaDi = Dinalungan, Casiguran, Dilasag — priority municipalities closest to the dorm
+  const DICADI = ['Dinalungan','Casiguran','Dilasag'];
+  function isDiCaDi(addr) {
+    const m = municipalityFrom(addr);
+    return DICADI.some(d => m.toLowerCase().includes(d.toLowerCase()));
+  }
+
+  // ── Registration search/sort state ──────────────────────────────────────
+  let _regAccounts = [];   // raw accounts from last fetch (pending or rejected)
+  let _regSortKey  = 'dicadi-oldest'; // default: DiCaDi first, then oldest
+
+  /** Apply search + sort to _regAccounts and re-render the registrations list.
+   *  Dispatches to applyRejFilters() when the Rejected tab is active. */
+  function applyRegFilters() {
+    if (currentRegTab === 'rejected') { applyRejFilters(); return; }
+    const q      = (document.getElementById('reg-search')?.value || '').toLowerCase().trim();
+    const sortEl = document.getElementById('reg-sort');
+    if (sortEl) _regSortKey = sortEl.value;
+
+    let accounts = _regAccounts;
+
+    // Search: name, email, municipality
+    if (q) {
+      accounts = accounts.filter(a => {
+        const name = `${a.first_name||''} ${a.middle_name||''} ${a.last_name||''}`.toLowerCase();
+        const muni = municipalityFrom(a.permanent_address || '').toLowerCase();
+        return name.includes(q) || (a.email||'').toLowerCase().includes(q) || muni.includes(q);
+      });
+    }
+
+    // Sort
+    const YEAR_ORD = {'1st Year':1,'2nd Year':2,'3rd Year':3,'4th Year':4,'5th Year':5};
+    accounts = [...accounts].sort((a, b) => {
+      const aD = isDiCaDi(a.permanent_address);
+      const bD = isDiCaDi(b.permanent_address);
+      switch(_regSortKey) {
+        case 'dicadi-oldest':
+          if (aD !== bD) return aD ? -1 : 1;
+          return new Date(a.created_at||0) - new Date(b.created_at||0);
+        case 'oldest':
+          return new Date(a.created_at||0) - new Date(b.created_at||0);
+        case 'newest':
+          return new Date(b.created_at||0) - new Date(a.created_at||0);
+        case 'surname':
+          return (a.last_name||'').localeCompare(b.last_name||'','en',{sensitivity:'base'});
+        case 'yearlevel':
+          return (YEAR_ORD[a.year_level||'']??99) - (YEAR_ORD[b.year_level||'']??99);
+        case 'municipality':
+          return municipalityFrom(a.permanent_address||'')
+            .localeCompare(municipalityFrom(b.permanent_address||''),'en',{sensitivity:'base'});
+        default:
+          return 0;
+      }
+    });
+
+    // Count label
+    const countEl = document.getElementById('reg-count');
+    if (countEl) countEl.textContent = accounts.length ? `${accounts.length} shown` : '';
+
+    // Render
+    const el = document.getElementById('registrations-list');
+    if (!el) return;
+    if (!accounts.length) {
+      el.innerHTML = '<div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-12 text-center"><i class="fa-solid fa-magnifying-glass text-4xl text-slate-300 mb-3 block"></i><p class="font-display font-semibold text-slate-700 dark:text-slate-300">No results found.</p><p class="text-sm text-slate-400 mt-1">Try a different search term or sort.</p></div>';
+      return;
+    }
+    el.innerHTML = '<div class="divide-y divide-slate-100 dark:divide-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">'
+      + accounts.map(a => renderRegistrationRow(a)).join('')
+      + '</div>';
+    // Re-attach toggle listeners
+    el.querySelectorAll('[data-reg-toggle]').forEach(btn => {
+      btn.addEventListener('click', function(){
+        const id = this.dataset.regToggle;
+        const detail = document.getElementById('reg-detail-'+id);
+        const icon   = this.querySelector('.expand-icon');
+        const isOpen = !detail.classList.contains('hidden');
+        el.querySelectorAll('[data-reg-detail]').forEach(d2 => { if(d2.id !== 'reg-detail-'+id) d2.classList.add('hidden'); });
+        el.querySelectorAll('.expand-icon').forEach(i2 => { if(i2 !== icon) i2.classList.remove('rotate-180'); });
+        detail.classList.toggle('hidden', isOpen);
+        icon.classList.toggle('rotate-180', !isOpen);
+      });
+    });
+    el.querySelectorAll('[data-lightbox-url]').forEach(el2 => {
+      el2.addEventListener('click', () => openLightbox(el2.dataset.lightboxUrl, el2.dataset.lightboxTitle||''));
+    });
+  }
+
+  // ── Billing sort state ────────────────────────────────────────────────
+  let _billingData    = [];   // raw bills from last fetch
+  let _billingSortKey = 'surname';
+  let _billingSortDir = 'asc';
+
+  function setBillingSort(col) {
+    if (_billingSortKey === col) {
+      _billingSortDir = _billingSortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      _billingSortKey = col;
+      _billingSortDir = 'asc';
+    }
+    // Sync the <select> to match
+    const sel = document.getElementById('billing-sort');
+    if (sel) {
+      const mapped = _billingSortDir === 'desc' ? _billingSortKey + '-desc' : _billingSortKey;
+      // Best-effort match; not all cols have desc variant in the select
+      if ([...sel.options].some(o => o.value === mapped)) sel.value = mapped;
+    }
+    // Update column sort icons
+    const iconMap = {
+      surname:        'bsort-icon-surname',
+      room:           'bsort-icon-room',
+      'status-unpaid':'bsort-icon-status',
+      'paid-date-desc':'bsort-icon-date',
+      receipt:        'bsort-icon-receipt',
+      note:           'bsort-icon-note',
+    };
+    Object.entries(iconMap).forEach(([c, id]) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const active = (c === _billingSortKey || (c==='paid-date-desc' && _billingSortKey==='paiddate'));
+      el.className = active
+        ? `fa-solid fa-sort-${_billingSortDir==='asc'?'up':'down'} text-brand-500 ml-1`
+        : 'fa-solid fa-sort text-slate-300 ml-1';
+    });
+    applyBillingSort();
+  }
+
+  function applyBillingSort() {
+    const sel = document.getElementById('billing-sort');
+    if (sel) {
+      const v = sel.value;
+      // Map select value → _billingSortKey + _billingSortDir
+      const map = {
+        'surname':{'k':'surname','d':'asc'}, 'surname-desc':{'k':'surname','d':'desc'},
+        'room':{'k':'room','d':'asc'}, 'room-desc':{'k':'room','d':'desc'},
+        'status-unpaid':{'k':'status','d':'unpaid'}, 'status-paid':{'k':'status','d':'paid'},
+        'paid-date-desc':{'k':'paiddate','d':'desc'}, 'paid-date-asc':{'k':'paiddate','d':'asc'},
+        'receipt':{'k':'receipt','d':'asc'}, 'note':{'k':'note','d':'asc'},
+      };
+      if (map[v]) { _billingSortKey = map[v].k; _billingSortDir = map[v].d; }
+    }
+    const STATUS_ORD = {unpaid:0,overdue:1,waived:2,paid:3};
+    const sorted = [..._billingData].sort((a, b) => {
+      const aLast = a.last_name||'', bLast = b.last_name||'';
+      switch(_billingSortKey) {
+        case 'surname':
+          return (_billingSortDir==='asc'?1:-1) * aLast.localeCompare(bLast,'en',{sensitivity:'base'});
+        case 'room': {
+          const ra=parseInt(a.room_number??a.roomNo??0,10), rb=parseInt(b.room_number??b.roomNo??0,10);
+          return (_billingSortDir==='asc'?1:-1)*(ra-rb||(a.bed_number??0)-(b.bed_number??0));
+        }
+        case 'status': {
+          const sa=STATUS_ORD[a.status]??0, sb=STATUS_ORD[b.status]??0;
+          return _billingSortDir==='unpaid' ? sa-sb : sb-sa;
+        }
+        case 'paiddate': {
+          const da=a.paid_at?new Date(a.paid_at):null, db=b.paid_at?new Date(b.paid_at):null;
+          if(!da&&!db) return 0; if(!da) return 1; if(!db) return -1;
+          return _billingSortDir==='desc' ? db-da : da-db;
+        }
+        case 'receipt':
+          return (b.receipt_url?1:0)-(a.receipt_url?1:0);
+        case 'note':
+          return (b.user_comment?1:0)-(a.user_comment?1:0);
+        default: return 0;
+      }
+    });
+    renderBillingRows(sorted);
+  }
+
+  /** Render billing rows from a pre-sorted array (extracted from loadBilling for reuse) */
+  function renderBillingRows(bills) {
+    const tbody = document.getElementById('billing-tbody');
+    if (!tbody) return;
+    const countEl = document.getElementById('billing-count');
+    if (countEl) countEl.textContent = bills.length ? `${bills.length} records` : '';
+    if (!bills.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">No records for this month.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = bills.map(b => {
+      const roomNo    = b.room_number ?? b.roomNo ?? '—';
+      const bedNo     = b.bed_number  ?? b.bedNo  ?? '—';
+      const firstName = b.first_name  ?? b.firstName ?? '';
+      const lastName  = b.last_name   ?? b.lastName  ?? '';
+      const middleName= b.middle_name ?? b.middleName ?? '';
+      const username  = b.username    ?? '';
+      const email     = b.email       ?? '';
+      // Surname, First M.I. format
+      const mi = middleName.trim();
+      const miStr = mi ? ' ' + mi[0].toUpperCase() + '.' : '';
+      const displayName = lastName
+        ? `${lastName}, ${firstName}${miStr}`
+        : [firstName, lastName].filter(Boolean).join(' ') || '(unknown)';
+      const avatarSrc = escHtml(b.avatar || avatarUrl(firstName, lastName));
+      const statusBadge = b.status === 'paid'
+        ? '<span class="badge badge-approved">Paid</span>'
+        : b.status === 'waived'
+        ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500">Waived</span>'
+        : b.status === 'overdue'
+        ? '<span class="badge badge-rejected">Overdue</span>'
+        : '<span class="badge badge-pending">Unpaid</span>';
+      const remindBtn = `<button class="remind-bill-btn text-xs font-semibold text-brand-600 hover:bg-brand-50 px-3 py-1 rounded-lg border border-brand-200 transition-colors"
+          id="remind-btn-${b.id}" data-bill-id="${b.id}" data-first-name="${escHtml(firstName)}" data-email="${escHtml(email)}">
+          <i class="fa-solid fa-bell mr-1"></i>Remind</button>`;
+      const actionCell = b.status === 'waived'
+        ? '<span class="text-xs text-slate-400 font-semibold">Waived</span>'
+        : b.status === 'paid'
+        ? `<div class="flex items-center gap-1 flex-wrap">
+             <span class="text-xs text-green-500 font-semibold"><i class="fa-solid fa-circle-check mr-1"></i>Settled</span>
+             <button class="unbill-btn text-xs font-semibold text-orange-500 hover:bg-orange-50 px-2 py-1 rounded-lg border border-orange-200 transition-colors" data-bill-id="${b.id}" title="Undo payment"><i class="fa-solid fa-rotate-left mr-1"></i>Undo</button>
+           </div>`
+        : `<div class="flex items-center gap-1 flex-wrap">
+             <button class="paybill-btn text-xs font-semibold text-green-600 hover:bg-green-50 px-3 py-1 rounded-lg border border-green-200 transition-colors" data-bill-id="${b.id}"><i class="fa-solid fa-check mr-1"></i>Mark Paid</button>
+             ${remindBtn}
+           </div>`;
+      const commentHtml = b.user_comment
+        ? `<span class="text-xs text-amber-700 dark:text-amber-300 italic" title="${escHtml(b.user_comment)}">
+            <i class="fa-solid fa-comment-dots mr-1 text-amber-400"></i>${escHtml(b.user_comment.length > 40 ? b.user_comment.slice(0,40)+'…' : b.user_comment)}
+           </span>`
+        : '<span class="text-xs text-slate-300">—</span>';
+      const receiptHtml = b.receipt_url
+        ? `<div class="flex items-center gap-1.5">
+             <button type="button"
+               onclick="openLightbox('${escHtml(b.receipt_url)}','GCash Receipt — ${escHtml(displayName)}')"
+               title="View GCash receipt" class="cursor-zoom-in group relative">
+               <img src="${escHtml(b.receipt_url)}" alt="Receipt"
+                 class="h-10 w-14 rounded-lg object-cover border border-green-200 group-hover:opacity-80 transition-opacity"/>
+               <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/25 rounded-lg">
+                 <i class="fa-solid fa-magnifying-glass-plus text-white text-xs drop-shadow"></i>
+               </div>
+             </button>
+             <button class="clear-receipt-btn text-[10px] text-red-400 hover:text-red-600 transition-colors" data-bill-id="${b.id}" title="Remove receipt"><i class="fa-solid fa-trash-can"></i></button>
+           </div>`
+        : `<span class="text-xs text-slate-300 italic">Not uploaded</span>`;
+      return `<tr class="border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+        <td class="px-4 py-3">
+          <div class="flex items-center gap-2">
+            <img src="${avatarSrc}" class="w-8 h-8 rounded-full object-cover flex-shrink-0" onerror="this.src='${escHtml(avatarUrl(firstName,lastName))}'"/>
+            <div>
+              <p class="text-sm font-bold text-slate-800 dark:text-slate-100">${escHtml(displayName)}</p>
+              <p class="text-xs text-brand-500">@${escHtml(username)}</p>
+            </div>
+          </div>
+        </td>
+        <td class="px-4 py-3"><p class="text-sm font-semibold text-slate-700 dark:text-slate-200">Room ${roomNo} · Bed ${bedNo}</p></td>
+        <td class="px-4 py-3 text-sm font-semibold text-slate-800 dark:text-slate-100">₱${(b.amount||200).toFixed(2)}</td>
+        <td class="px-4 py-3">${statusBadge}</td>
+        <td class="px-4 py-3 text-xs text-slate-400">${b.paid_at ? reltime(b.paid_at) : '—'}</td>
+        <td class="px-4 py-3">${receiptHtml}</td>
+        <td class="px-4 py-3 max-w-[180px]">${commentHtml}</td>
+        <td class="px-4 py-3">${actionCell}</td>
+      </tr>`;
+    }).join('');
   }
 
   /** Render top municipality chips in the KPI card */
@@ -2835,13 +3185,8 @@
     const muniMap = {};
     residents.forEach(u => {
       const addr = u.permanentAddress || u.presentAddress || u.permanent_address || u.present_address || '';
-      if (!addr) { muniMap['Unknown'] = (muniMap['Unknown'] || 0) + 1; return; }
-      const parts = addr.split(',').map(s => s.trim()).filter(Boolean);
-      // parts[1] = City/Municipality in standard PSGC address string
-      let muni = parts.length >= 2 ? parts[1] : parts[0];
-      // Normalise common prefixes so "City of Baler" and "Baler" merge
-      if (muni) muni = muni.replace(/^City of\s+/i, '').replace(/^Municipality of\s+/i, '').trim();
-      muniMap[muni || 'Unknown'] = (muniMap[muni || 'Unknown'] || 0) + 1;
+      const muni = municipalityFrom(addr);
+      muniMap[muni] = (muniMap[muni] || 0) + 1;
     });
     const sorted = Object.entries(muniMap).sort((a,b) => b[1]-a[1]);
     const topEl  = document.getElementById('um-top-municipality');
@@ -2876,6 +3221,13 @@
       const activeTag=!u.isActive?'<span class="badge badge-rejected ml-1">Banned</span>':'';
       const rejectedTag=u.accountStatus==='rejected'?'<span class="badge badge-rejected ml-1">Rejected</span>':'';
 
+      // Surname, First M.I. format
+      const mi = (u.middleName||'').trim();
+      const miStr = mi ? ' ' + mi[0].toUpperCase() + '.' : '';
+      const surnameFirst = u.lastName
+        ? `${escHtml(u.lastName)}, ${escHtml(u.firstName)}${escHtml(miStr)}`
+        : escHtml(fullName(u));
+
       // Role cell
       const roleCellTxt = u.role === 'admin' ? 'Admin' : 'Resident';
       const roleCellCls = u.role === 'admin'
@@ -2899,20 +3251,29 @@
       const yrRaw = u.year_level || u.yearLevel || '';
       const yrCell = yrRaw ? `<span class="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-950/40 px-2 py-0.5 rounded-lg">${escHtml(yrRaw)}</span>` : `<span class="text-xs text-slate-300 dark:text-slate-600">—</span>`;
 
+      // Room number
+      const roomStr = u.roomNumber ? `<span class="text-xs font-semibold text-slate-700 dark:text-slate-200">Room ${escHtml(String(u.roomNumber))}${u.bedNumber ? ' · Bed '+escHtml(String(u.bedNumber)):''}</span>` : `<span class="text-xs text-slate-300 dark:text-slate-600">—</span>`;
+
+      // Municipality from permanent address
+      const muni = municipalityFrom(u.permanentAddress || u.permanent_address || u.presentAddress || u.present_address || '');
+      const muniCell = muni && muni !== '—'
+        ? `<span class="text-xs font-semibold text-slate-600 dark:text-slate-300">${escHtml(muni)}</span>`
+        : `<span class="text-xs text-slate-300 dark:text-slate-600">—</span>`;
+
       return `<tr class="border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors" id="user-row-${u.id}">
-        <td class="px-4 py-3"><div class="flex items-center gap-3"><img src="${av}" class="w-8 h-8 rounded-full object-cover flex-shrink-0" onerror="this.src='${avatarUrl(u.firstName,u.lastName)}'"/><div><p class="font-semibold text-sm text-slate-800 dark:text-slate-100">${escHtml(fullName(u))}${roleTag}${activeTag}${rejectedTag}</p><a href="/profile.html?u=${escHtml(u.username)}" target="_blank" class="text-xs text-brand-500 hover:underline">@${escHtml(u.username)}</a></div></div></td>
-        <td class="px-4 py-3 text-xs text-slate-500 max-w-xs truncate">${escHtml(u.email)}</td>
+        <td class="px-4 py-3"><div class="flex items-center gap-3"><img src="${av}" class="w-8 h-8 rounded-full object-cover flex-shrink-0" onerror="this.src='${avatarUrl(u.firstName,u.lastName)}'"/><div><p class="font-semibold text-sm text-slate-800 dark:text-slate-100">${surnameFirst}${roleTag}${activeTag}${rejectedTag}</p><a href="/profile.html?u=${escHtml(u.username)}" target="_blank" class="text-xs text-brand-500 hover:underline">@${escHtml(u.username)}</a></div></div></td>
+        <td class="px-4 py-3">${roomStr}</td>
+        <td class="px-4 py-3">${muniCell}</td>
         <td class="px-4 py-3">${yrCell}</td>
-        <td class="px-4 py-3">${roleCell}</td>
         <td class="px-4 py-3">${repCell}</td>
         <td class="px-4 py-3">${rptCell}</td>
         <td class="px-4 py-3 text-xs text-slate-400">${reltime(u.createdAt)}</td>
         <td class="px-4 py-3"><div class="flex items-center gap-1 flex-wrap">
           ${!u.idVerified?`<button onclick="verifyUser('${u.id}')" class="text-xs font-medium text-green-600 hover:bg-green-50 dark:hover:bg-green-950 px-2 py-1 rounded-lg transition-colors" title="Verify ID"><i class="fa-solid fa-check mr-1"></i>Verify</button>`:''}
-          ${u.isActive&&u.id!==currentUser?.id?`<button data-action="ban" data-uid="${u.id}" data-uname="${fullName(u)}" class="text-xs font-medium text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950 px-2 py-1 rounded-lg transition-colors"><i class="fa-solid fa-ban mr-1"></i>Ban</button>`:''}
+          ${u.isActive&&u.id!==currentUser?.id?`<button data-action="ban" data-uid="${u.id}" data-uname="${surnameFirst}" class="text-xs font-medium text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950 px-2 py-1 rounded-lg transition-colors"><i class="fa-solid fa-ban mr-1"></i>Ban</button>`:''}
           ${!u.isActive?`<button data-action="unban" data-uid="${u.id}" class="text-xs font-medium text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950 px-2 py-1 rounded-lg transition-colors"><i class="fa-solid fa-unlock mr-1"></i>Unban</button>`:''}
           <button data-action="review" data-uid="${u.id}" class="review-toggle-btn text-xs font-medium text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950 px-2 py-1 rounded-lg transition-colors"><i class="fa-solid fa-chevron-down mr-1 review-icon-${u.id}"></i>Review</button>
-          ${u.id!==currentUser?.id?`<button data-action="delete" data-uid="${u.id}" data-uname="${fullName(u)}" class="text-xs font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-950 px-2 py-1 rounded-lg transition-colors"><i class="fa-solid fa-trash mr-1"></i>Del</button>`:''}
+          ${u.id!==currentUser?.id?`<button data-action="delete" data-uid="${u.id}" data-uname="${surnameFirst}" class="text-xs font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-950 px-2 py-1 rounded-lg transition-colors"><i class="fa-solid fa-trash mr-1"></i>Del</button>`:''}
         </div></td>
       </tr>
       <tr id="user-review-row-${u.id}" class="hidden border-b-2 border-brand-100 dark:border-brand-900/40" style="overflow:visible">
@@ -2927,12 +3288,19 @@
   function filterUsers(q){
     let f = allUsers;
     // Role filter
-    if(_userRoleFilter !== 'all') f = f.filter(u => u.role === _userRoleFilter);
-    // Search
-    if(q) f = f.filter(u=>`${fullName(u)} ${u.username} ${u.email}`.toLowerCase().includes(q.toLowerCase()));
+    f = f.filter(u => u.role === _userRoleFilter);
+    // Search — covers name, username, email, municipality
+    if(q) {
+      const lq = q.toLowerCase();
+      f = f.filter(u => {
+        const muni = municipalityFrom(u.permanentAddress||u.permanent_address||u.presentAddress||u.present_address||'');
+        return `${fullName(u)} ${u.username} ${u.email} ${muni}`.toLowerCase().includes(lq);
+      });
+    }
+    // Sort
+    f = _applyUserSort(f);
     renderUsers(f);
   }
-  // filterUsers is defined above in the new block
   async function verifyUser(id){const r=await fetch(`/api/admin/users/${id}/verify`,{method:'PUT'});const d=await r.json();if(d.error){toast(d.error,'error');return;}toast('User verified!');refreshAll();}
   function banUser(id,name){showConfirm('Ban User',`Ban "${name}"? They won't be able to log in.`,async()=>{const r=await fetch(`/api/admin/users/${id}/ban`,{method:'PUT'});const d=await r.json();if(d.error){toast(d.error,'error');return;}toast('User banned.','info');refreshAll();});}
   async function unbanUser(id){const r=await fetch(`/api/admin/users/${id}/unban`,{method:'PUT'});const d=await r.json();if(d.error){toast(d.error,'error');return;}toast('User unbanned!');refreshAll();}
@@ -3089,35 +3457,104 @@
     const el=document.getElementById('registrations-list');
     if(!el)return;
     setLoading(el);
-    const r=await fetch('/api/admin/accounts/rejected');
-    const d=await r.json();
-    if(!d.accounts?.length){
-      el.innerHTML='<div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-12 text-center"><i class="fa-solid fa-folder-open text-4xl text-slate-300 mb-3 block"></i><p class="font-display font-semibold text-slate-700 dark:text-slate-300">No rejected registrations.</p><p class="text-sm text-slate-400 mt-1">Rejected accounts will appear here for review.</p></div>';
+    try {
+      const r=await fetch('/api/admin/accounts/rejected');
+      const d=await r.json();
+      // Store in shared state so search/sort work on rejected tab too
+      _regAccounts = d.accounts || [];
+      if(!_regAccounts.length){
+        el.innerHTML='<div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-12 text-center"><i class="fa-solid fa-folder-open text-4xl text-slate-300 mb-3 block"></i><p class="font-display font-semibold text-slate-700 dark:text-slate-300">No rejected registrations.</p><p class="text-sm text-slate-400 mt-1">Rejected accounts will appear here for review.</p></div>';
+        return;
+      }
+      applyRejFilters();
+    } catch(e) {
+      console.error('[loadRejectedAccounts]', e);
+      el.innerHTML='<div class="p-8 text-center text-red-400 text-sm">Failed to load rejected registrations.</div>';
+    }
+  }
+
+  /** Render a rejected account row — used by applyRejFilters */
+  function renderRejectedRow(a) {
+    const mi  = (a.middle_name||'').trim();
+    const miS = mi ? ' ' + mi[0].toUpperCase() + '.' : '';
+    const surnameFirst = a.last_name
+      ? `${escHtml(a.last_name)}, ${escHtml(a.first_name||'')}${escHtml(miS)}`
+      : escHtml([a.first_name,a.middle_name,a.last_name,a.suffix].filter(Boolean).join(' '));
+    const av   = escHtml(a.avatar || avatarUrl(a.first_name, a.last_name));
+    const avFb = escHtml(avatarUrl(a.first_name, a.last_name));
+    const muni = municipalityFrom(a.permanent_address||'');
+    const subtitle = [
+      escHtml(a.email||''),
+      muni !== '—' ? escHtml(muni) : null,
+      a.year_level ? escHtml(a.year_level) : null,
+      a.course ? escHtml(courseLabel(a.course)||a.course) : null,
+      (a.specialization && a.specialization !== '(none)') ? `<span class="text-brand-400">${escHtml(a.specialization)}</span>` : null,
+      a.rejection_reason ? `<span class="text-red-400">${escHtml(a.rejection_reason.slice(0,60)+(a.rejection_reason.length>60?'…':''))}</span>` : null,
+    ].filter(Boolean).join(' &nbsp;·&nbsp; ');
+    return `<div>
+      <button data-rej-toggle="${a.id}" class="w-full flex items-center gap-4 px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors text-left group">
+        <img src="${av}" onerror="this.src='${avFb}'" class="w-11 h-11 rounded-xl object-cover flex-shrink-0 border border-slate-200 dark:border-slate-700 opacity-70"/>
+        <div class="flex-1 min-w-0">
+          <p class="font-bold text-slate-700 dark:text-slate-300 text-sm">${surnameFirst}</p>
+          <p class="text-xs text-slate-400 truncate mt-0.5">${subtitle}</p>
+        </div>
+        <span class="text-xs text-slate-400 flex-shrink-0 hidden sm:block">${reltime(a.rejected_at)}</span>
+        <span class="badge badge-rejected text-xs px-2 py-0.5 flex-shrink-0">Rejected</span>
+        <i class="fa-solid fa-chevron-down expand-icon text-slate-400 group-hover:text-slate-600 transition-all duration-200 flex-shrink-0"></i>
+      </button>
+      <div id="rej-detail-${a.id}" class="hidden border-t border-slate-100 dark:border-slate-800">
+        ${renderRejectedCard(a)}
+      </div>
+    </div>`;
+  }
+
+  /** Apply search + sort to rejected accounts and re-render */
+  function applyRejFilters() {
+    const q      = (document.getElementById('reg-search')?.value || '').toLowerCase().trim();
+    const sortEl = document.getElementById('reg-sort');
+    if (sortEl) _regSortKey = sortEl.value;
+    const YEAR_ORD = {'1st Year':1,'2nd Year':2,'3rd Year':3,'4th Year':4,'5th Year':5};
+
+    let accounts = _regAccounts;
+    if (q) {
+      accounts = accounts.filter(a => {
+        const name = `${a.first_name||''} ${a.middle_name||''} ${a.last_name||''}`.toLowerCase();
+        const muni = municipalityFrom(a.permanent_address||'').toLowerCase();
+        return name.includes(q) || (a.email||'').toLowerCase().includes(q) || muni.includes(q);
+      });
+    }
+    accounts = [...accounts].sort((a, b) => {
+      const aD = isDiCaDi(a.permanent_address), bD = isDiCaDi(b.permanent_address);
+      switch(_regSortKey) {
+        case 'dicadi-oldest':
+          if (aD !== bD) return aD ? -1 : 1;
+          return new Date(a.rejected_at||a.original_created_at||0) - new Date(b.rejected_at||b.original_created_at||0);
+        case 'oldest':
+          return new Date(a.rejected_at||0) - new Date(b.rejected_at||0);
+        case 'newest':
+          return new Date(b.rejected_at||0) - new Date(a.rejected_at||0);
+        case 'surname':
+          return (a.last_name||'').localeCompare(b.last_name||'','en',{sensitivity:'base'});
+        case 'yearlevel':
+          return (YEAR_ORD[a.year_level||'']??99) - (YEAR_ORD[b.year_level||'']??99);
+        case 'municipality':
+          return municipalityFrom(a.permanent_address||'')
+            .localeCompare(municipalityFrom(b.permanent_address||''),'en',{sensitivity:'base'});
+        default: return 0;
+      }
+    });
+
+    const countEl = document.getElementById('reg-count');
+    if (countEl) countEl.textContent = accounts.length ? `${accounts.length} shown` : '';
+
+    const el = document.getElementById('registrations-list');
+    if (!el) return;
+    if (!accounts.length) {
+      el.innerHTML = '<div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-12 text-center"><i class="fa-solid fa-magnifying-glass text-4xl text-slate-300 mb-3 block"></i><p class="font-display font-semibold text-slate-700 dark:text-slate-300">No results found.</p><p class="text-sm text-slate-400 mt-1">Try a different search term or sort.</p></div>';
       return;
     }
-    // Collapsed list for rejected accounts too
     el.innerHTML = '<div class="divide-y divide-slate-100 dark:divide-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">'
-      + d.accounts.map(a => {
-          const parts = [a.first_name, a.middle_name, a.last_name, a.suffix].filter(Boolean);
-          const fullName = parts.map(escHtml).join(' ');
-          const av = escHtml(a.avatar || avatarUrl(a.first_name, a.last_name));
-          const avFb = escHtml(avatarUrl(a.first_name, a.last_name));
-          return `<div>
-            <button data-rej-toggle="${a.id}" class="w-full flex items-center gap-4 px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors text-left group">
-              <img src="${av}" onerror="this.src='${avFb}'" class="w-11 h-11 rounded-xl object-cover flex-shrink-0 border border-slate-200 dark:border-slate-700 opacity-70"/>
-              <div class="flex-1 min-w-0">
-                <p class="font-bold text-slate-700 dark:text-slate-300 text-sm">${fullName}</p>
-                <p class="text-xs text-slate-400 truncate mt-0.5">${escHtml(a.email)} ${a.rejection_reason ? '&nbsp;·&nbsp; <span class="text-red-400">' + escHtml(a.rejection_reason.slice(0,60)) + (a.rejection_reason.length>60?'…':'') + '</span>' : ''}</p>
-              </div>
-              <span class="text-xs text-slate-400 flex-shrink-0 hidden sm:block">${reltime(a.rejected_at)}</span>
-              <span class="badge badge-rejected text-xs px-2 py-0.5 flex-shrink-0">Rejected</span>
-              <i class="fa-solid fa-chevron-down expand-icon text-slate-400 group-hover:text-slate-600 transition-all duration-200 flex-shrink-0"></i>
-            </button>
-            <div id="rej-detail-${a.id}" class="hidden border-t border-slate-100 dark:border-slate-800">
-              ${renderRejectedCard(a)}
-            </div>
-          </div>`;
-        }).join('')
+      + accounts.map(a => renderRejectedRow(a)).join('')
       + '</div>';
     el.querySelectorAll('[data-rej-toggle]').forEach(btn => {
       btn.addEventListener('click', function(){
@@ -4227,11 +4664,16 @@
   }
 
   function studentResultHtml(u) {
-    return `<div onclick="selectStudentForAssign('${u.id}','${escJS(fullName(u))}')"
+    const mi  = (u.middleName||'').trim();
+    const miS = mi ? ' ' + mi[0].toUpperCase() + '.' : '';
+    const surnameFirst = u.lastName
+      ? `${u.lastName}, ${u.firstName||''}${miS}`
+      : fullName(u);
+    return `<div onclick="selectStudentForAssign('${u.id}','${escJS(surnameFirst)}')"
          class="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors">
       <img src="${escHtml(u.avatar||avatarUrl(u.firstName,u.lastName))}" class="w-8 h-8 rounded-full object-cover flex-shrink-0"/>
       <div class="min-w-0">
-        <p class="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">${escHtml(fullName(u))}</p>
+        <p class="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">${escHtml(surnameFirst)}</p>
         <p class="text-xs text-slate-400">@${escHtml(u.username)} · ${u.sex || 'N/A'}</p>
       </div>
     </div>`;
@@ -4355,8 +4797,8 @@
     }
 
     // Compute totals
-    const total  = bills.reduce((s,b) => s + (b.amount || 200), 0);
-    const paidAmt = bills.filter(b => b.status === 'paid').reduce((s,b) => s + (b.amount || 200), 0);
+    const total    = bills.reduce((s,b) => s + (b.amount || 200), 0);
+    const paidAmt  = bills.filter(b => b.status === 'paid').reduce((s,b) => s + (b.amount || 200), 0);
     const unpaidAmt = total - paidAmt;
     document.getElementById('billing-total').textContent   = '₱' + total.toLocaleString();
     document.getElementById('billing-paid').textContent    = '₱' + paidAmt.toLocaleString();
@@ -4370,77 +4812,14 @@
 
     if (!bills.length) {
       tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">No assigned residents this month. Assign students to rooms first.</td></tr>';
+      const countEl = document.getElementById('billing-count');
+      if (countEl) countEl.textContent = '';
       return;
     }
-    tbody.innerHTML = bills.map(b => {
-      const roomNo    = b.room_number ?? b.roomNo ?? '—';
-      const bedNo     = b.bed_number  ?? b.bedNo  ?? '—';
-      const firstName = b.first_name  ?? b.firstName ?? '';
-      const lastName  = b.last_name   ?? b.lastName  ?? '';
-      const username  = b.username    ?? '';
-      const email     = b.email       ?? '';
-      const fullName  = [firstName, lastName].filter(Boolean).join(' ') || '(unknown)';
-      const avatarSrc = escHtml(b.avatar || avatarUrl(firstName, lastName));
-      const statusBadge = b.status === 'paid'
-        ? '<span class="badge badge-approved">Paid</span>'
-        : b.status === 'waived'
-        ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500">Waived</span>'
-        : b.status === 'overdue'
-        ? '<span class="badge badge-rejected">Overdue</span>'
-        : '<span class="badge badge-pending">Unpaid</span>';
-      // NOTE: use data-* attributes to avoid apostrophe-in-name JS string breakage
-      const remindBtn = `<button class="remind-bill-btn text-xs font-semibold text-brand-600 hover:bg-brand-50 px-3 py-1 rounded-lg border border-brand-200 transition-colors"
-          id="remind-btn-${b.id}" data-bill-id="${b.id}" data-first-name="${escHtml(firstName)}" data-email="${escHtml(email)}">
-          <i class="fa-solid fa-bell mr-1"></i>Remind</button>`;
-      const actionCell = b.status === 'waived'
-        ? '<span class="text-xs text-slate-400 font-semibold">Waived</span>'
-        : b.status === 'paid'
-        ? `<div class="flex items-center gap-1 flex-wrap">
-             <span class="text-xs text-green-500 font-semibold"><i class="fa-solid fa-circle-check mr-1"></i>Settled</span>
-             <button class="unbill-btn text-xs font-semibold text-orange-500 hover:bg-orange-50 px-2 py-1 rounded-lg border border-orange-200 transition-colors" data-bill-id="${b.id}" title="Undo payment"><i class="fa-solid fa-rotate-left mr-1"></i>Undo</button>
-           </div>`
-        : `<div class="flex items-center gap-1 flex-wrap">
-             <button class="paybill-btn text-xs font-semibold text-green-600 hover:bg-green-50 px-3 py-1 rounded-lg border border-green-200 transition-colors" data-bill-id="${b.id}"><i class="fa-solid fa-check mr-1"></i>Mark Paid</button>
-             ${remindBtn}
-           </div>`;
-      const commentHtml = b.user_comment
-        ? `<span class="text-xs text-amber-700 dark:text-amber-300 italic" title="${escHtml(b.user_comment)}">
-            <i class="fa-solid fa-comment-dots mr-1 text-amber-400"></i>${escHtml(b.user_comment.length > 40 ? b.user_comment.slice(0,40)+'…' : b.user_comment)}
-           </span>`
-        : '<span class="text-xs text-slate-300">—</span>';
-      const receiptHtml = b.receipt_url
-        ? `<div class="flex items-center gap-1.5">
-             <button type="button"
-               onclick="openLightbox('${escHtml(b.receipt_url)}','GCash Receipt — ${escHtml(fullName)}')"
-               title="View GCash receipt" class="cursor-zoom-in group relative">
-               <img src="${escHtml(b.receipt_url)}" alt="Receipt"
-                 class="h-10 w-14 rounded-lg object-cover border border-green-200 group-hover:opacity-80 transition-opacity"/>
-               <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/25 rounded-lg">
-                 <i class="fa-solid fa-magnifying-glass-plus text-white text-xs drop-shadow"></i>
-               </div>
-             </button>
-             <button class="clear-receipt-btn text-[10px] text-red-400 hover:text-red-600 transition-colors" data-bill-id="${b.id}" title="Remove receipt"><i class="fa-solid fa-trash-can"></i></button>
-           </div>`
-        : `<span class="text-xs text-slate-300 italic">Not uploaded</span>`;
-      return `<tr class="border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50">
-        <td class="px-4 py-3">
-          <div class="flex items-center gap-2">
-            <img src="${avatarSrc}" class="w-8 h-8 rounded-full object-cover flex-shrink-0" onerror="this.src='${escHtml(avatarUrl(firstName,lastName))}'"/>
-            <div>
-              <p class="text-sm font-bold text-slate-800 dark:text-slate-100">${escHtml(fullName)}</p>
-              <p class="text-xs text-brand-500">@${escHtml(username)}</p>
-            </div>
-          </div>
-        </td>
-        <td class="px-4 py-3"><p class="text-sm font-semibold text-slate-700 dark:text-slate-200">Room ${roomNo} · Bed ${bedNo}</p></td>
-        <td class="px-4 py-3 text-sm font-semibold text-slate-800 dark:text-slate-100">₱${(b.amount||200).toFixed(2)}</td>
-        <td class="px-4 py-3">${statusBadge}</td>
-        <td class="px-4 py-3 text-xs text-slate-400">${b.paid_at ? reltime(b.paid_at) : '—'}</td>
-        <td class="px-4 py-3">${receiptHtml}</td>
-        <td class="px-4 py-3 max-w-[180px]">${commentHtml}</td>
-        <td class="px-4 py-3">${actionCell}</td>
-      </tr>`;
-    }).join('');
+
+    // Store raw data and apply current sort
+    _billingData = bills;
+    applyBillingSort();
   }
 
   async function generateMonthlyBills() {
