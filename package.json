@@ -14,6 +14,7 @@
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^9.6.0",
+    "better-sqlite3-session-store": "^0.1.0",
     "cloudinary": "^2.0.0",
     "connect-flash": "^0.1.1",
     "cors": "^2.8.5",
@@ -28,9 +29,9 @@
     "nodemailer": "^6.9.7",
     "passport": "^0.6.0",
     "passport-google-oauth20": "^2.0.0",
+    "resend": "^4.0.0",
     "sharp": "^0.33.0",
-    "socket.io": "^4.7.4",
-    "resend": "^4.0.0"
+    "socket.io": "^4.7.4"
   },
   "engines": {
     "node": ">=18.0.0"
