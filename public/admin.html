@@ -1350,7 +1350,7 @@
     else if(tab==='ai-log')loadAiModerationLog();
     else if(tab==='posts-pending')loadPendingPosts();
     else if(tab==='posts-all')loadAllPosts();
-    else if(tab==='users')renderUsers(allUsers);
+    else if(tab==='users')filterUsers(document.getElementById('user-filter')?.value||'');
     else if(tab==='logs')loadLogs();
     else if(tab==='dormitory')loadDormRooms();
     else if(tab==='billing'){ initBillingMonth(); loadBilling(); loadGcashSettings(); }
@@ -2062,7 +2062,7 @@
     try {
       const ur = await fetch('/api/admin/users').then(r => r.json());
       allUsers = ur.users || [];
-      renderUsers(allUsers);
+      filterUsers(document.getElementById('user-filter')?.value||'');
       document.getElementById('user-count-text').textContent = `${allUsers.length} total users`;
     } catch(e) { console.warn('[admin] refreshUsers failed:', e.message); }
   }
@@ -2099,7 +2099,7 @@
       allPosts=pr.posts||[];
       _lastStats = sr;  // cache for room mgmt and dashboard resident count
       renderStatCards(sr);renderCharts(sr);renderRecentUsers(allUsers.slice(0,5));
-      renderUsers(allUsers);renderPostsTable(allPosts);
+      filterUsers(document.getElementById('user-filter')?.value||'');renderPostsTable(allPosts);
       renderUserStats(allUsers);  // populate Resident Management KPI cards
       renderDashMunicipalityChart(allUsers);  // update dashboard municipality panel
       const resCount = allUsers.filter(u=>u.role!=='admin').length;
