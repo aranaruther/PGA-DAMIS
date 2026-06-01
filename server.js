@@ -20,6 +20,7 @@ const http      = require('http');
 const express   = require('express');
 const morgan    = require('morgan');
 const session   = require('express-session');
+const BetterSqlite3Store = require('better-sqlite3-session-store')(session);
 const passport  = require('passport');
 const flash     = require('connect-flash');
 const helmet    = require('helmet');
@@ -110,15 +111,26 @@ app.use(express.urlencoded({ extended: true }));
 app.set('trust proxy', 1);
 
 // ── Sessions ──────────────────────────────────────────
+// SQLite-backed store: survives redeployments, no memory leaks,
+// works correctly on Railway's single-process setup.
+const { db: _sessionDb } = require('./utils/db');
 app.use(session({
+  store: new BetterSqlite3Store({
+    client: _sessionDb,
+    expired: {
+      clear: true,
+      intervalMs: 15 * 60 * 1000,  // sweep expired sessions every 15 min
+    },
+  }),
   secret: process.env.SESSION_SECRET || 'fallback-dev-secret',
   resave: false,
   saveUninitialized: false,
   cookie: {
     secure:   process.env.NODE_ENV === 'production',
     httpOnly: true,
-    maxAge:   24 * 60 * 60 * 1000,
-  }
+    sameSite: 'lax',
+    maxAge:   7 * 24 * 60 * 60 * 1000,  // 7 days (was 1 day)
+  },
 }));
 
 // ── Passport ──────────────────────────────────────────

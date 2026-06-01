@@ -105,6 +105,15 @@ async function initSMTP() {
       pass: process.env.EMAIL_PASS,
     },
   });
+
+  // Railway blocks outbound SMTP (port 587) — skip the live verify in
+  // production to avoid a noisy timeout in the startup log.
+  // SendGrid handles all production email anyway.
+  if (process.env.NODE_ENV === 'production') {
+    console.log('   ℹ  Gmail SMTP configured (verify skipped in production — Railway blocks port 587)');
+    return;
+  }
+
   try {
     await smtpTransporter.verify();
     console.log('✅ Gmail SMTP connected —', process.env.EMAIL_USER);
