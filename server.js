@@ -20,7 +20,6 @@ const http      = require('http');
 const express   = require('express');
 const morgan    = require('morgan');
 const session   = require('express-session');
-const BetterSqlite3Store = require('better-sqlite3-session-store')(session);
 const passport  = require('passport');
 const flash     = require('connect-flash');
 const helmet    = require('helmet');
@@ -111,26 +110,15 @@ app.use(express.urlencoded({ extended: true }));
 app.set('trust proxy', 1);
 
 // ── Sessions ──────────────────────────────────────────
-// SQLite-backed store: survives redeployments, no memory leaks,
-// works correctly on Railway's single-process setup.
-const { db: _sessionDb } = require('./utils/db');
 app.use(session({
-  store: new BetterSqlite3Store({
-    client: _sessionDb,
-    expired: {
-      clear: true,
-      intervalMs: 15 * 60 * 1000,  // sweep expired sessions every 15 min
-    },
-  }),
   secret: process.env.SESSION_SECRET || 'fallback-dev-secret',
   resave: false,
   saveUninitialized: false,
   cookie: {
     secure:   process.env.NODE_ENV === 'production',
     httpOnly: true,
-    sameSite: 'lax',
-    maxAge:   7 * 24 * 60 * 60 * 1000,  // 7 days (was 1 day)
-  },
+    maxAge:   24 * 60 * 60 * 1000,
+  }
 }));
 
 // ── Passport ──────────────────────────────────────────
@@ -391,9 +379,7 @@ httpServer.listen(PORT, async () => {
   const { getDriver } = require('./utils/emailService');
   const emailDriverLabel = {
     sendgrid: `✔ SendGrid API (${process.env.SENDGRID_FROM || process.env.EMAIL_USER || '?'})`,
-    brevo:    `✔ Brevo API (${process.env.BREVO_FROM    || process.env.EMAIL_USER || '?'})`,
-    resend:   `✔ Resend API (${process.env.RESEND_FROM   || process.env.EMAIL_USER || '?'})`,
-    smtp:     `✔ Gmail SMTP (${process.env.EMAIL_USER   || '?'})`,
+    smtp:     `✔ Gmail SMTP (${process.env.EMAIL_USER || '?'})`,
     console:  '⚠ Console/dev — no real delivery (set SENDGRID_API_KEY + SENDGRID_FROM for production)',
   }[getDriver()] || '?';
   log.info(`Email        : ${emailDriverLabel}`);

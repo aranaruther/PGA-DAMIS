@@ -5,26 +5,27 @@
  * If a driver fails with a permanent account-level error it is marked
  * as degraded and skipped for the rest of the process lifetime.
  * The console driver is always the final fallback: OTPs are ALWAYS visible
- * in Railway logs even when every cloud provider is unavailable.
+ * in Railway logs even when every provider is unavailable.
  *
- * Driver priority: SENDGRID → BREVO → RESEND → SMTP → CONSOLE
+ * Driver priority: SENDGRID → SMTP (Gmail) → CONSOLE
  *
  * Setup (Railway env vars):
- *   SENDGRID → SENDGRID_API_KEY + SENDGRID_FROM  ← PRIMARY
- *              ✅ 100 emails/day free forever. No IP restrictions. No domain needed.
+ *   SENDGRID → SENDGRID_API_KEY + SENDGRID_FROM  ← PRIMARY (recommended)
+ *              ✅ 100 emails/day free forever. No IP restrictions.
  *              Sign up  → https://signup.sendgrid.com
  *              Verify   → Settings → Sender Authentication → Single Sender Verification
  *              API key  → Settings → API Keys → Create API Key (Mail Send permission only)
- *   BREVO    → BREVO_API_KEY + BREVO_FROM
- *              ⚠ Disable IP restriction: https://app.brevo.com/security/authorised_ips
- *   RESEND   → RESEND_API_KEY  (requires a verified domain, not just an email)
- *   SMTP     → USE_REAL_EMAIL=true + EMAIL_USER + EMAIL_PASS
- *              ⚠ Railway blocks SMTP ports 465/587
- *   CONSOLE  → automatic fallback when no provider is configured or all fail
  *
- * Permanent failure detection (driver is skipped for remainder of uptime):
+ *   SMTP     → USE_REAL_EMAIL=true + EMAIL_USER + EMAIL_PASS  ← FALLBACK
+ *              ⚠ Railway blocks SMTP ports 465/587 — only works locally or on a VPS
+ *              EMAIL_PASS must be a Gmail App Password (16 chars, no spaces)
+ *
+ *   CONSOLE  → automatic fallback when no provider is configured or all fail
+ *              OTPs and email content appear in the Railway log.
+ *
+ * Permanent failure detection (driver skipped for rest of process lifetime):
  *   HTTP 401, "temporarily blocked", "account suspended", "sender not verified",
- *   "domain not verified", "unrecognized IP"
+ *   "domain not verified", "unrecognized IP", "invalid api key", "auth failed"
  */
 
 'use strict';
@@ -32,33 +33,28 @@
 const nodemailer = require('nodemailer');
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Waterfall driver chain
+// Waterfall driver chain: SENDGRID → SMTP → CONSOLE
 // ─────────────────────────────────────────────────────────────────────────────
-
-/** Ordered list of drivers available in this process (console always last). */
 const DRIVER_CHAIN = (() => {
   const chain = [];
-  if (process.env.SENDGRID_API_KEY)             chain.push('sendgrid');
-  if (process.env.BREVO_API_KEY)                chain.push('brevo');
-  if (process.env.RESEND_API_KEY)               chain.push('resend');
-  if (process.env.USE_REAL_EMAIL === 'true')    chain.push('smtp');
-  chain.push('console'); // always present
+  if (process.env.SENDGRID_API_KEY)          chain.push('sendgrid');
+  if (process.env.USE_REAL_EMAIL === 'true') chain.push('smtp');
+  chain.push('console'); // always present — ensures OTPs always reach the log
   return chain;
 })();
 
 /**
  * Per-driver health. 'ok' → try normally. 'failed' → skip (permanent error).
- * Resets only on process restart. This prevents hammering a blocked provider.
+ * Resets only on process restart — prevents hammering a blocked provider.
  */
 const _driverHealth = Object.fromEntries(DRIVER_CHAIN.map(d => [d, 'ok']));
 
-/** The primary (first non-console) driver — used for startup log & getDriver(). */
-const DRIVER = DRIVER_CHAIN[0]; // may be 'console' if nothing is configured
+/** The primary (first non-console) driver — used for startup log. */
+const DRIVER = DRIVER_CHAIN[0];
 
 /**
  * Returns true for errors that mean the driver itself is permanently broken
- * for this process (account blocked, credentials invalid, IP banned, etc.).
- * These are distinct from transient network errors; we skip the driver permanently.
+ * for this process lifetime (blocked account, bad credentials, IP banned).
  */
 function _isPermanentDriverError(msg = '') {
   const m = msg.toLowerCase();
@@ -77,22 +73,6 @@ function _isPermanentDriverError(msg = '') {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Lazy-loaded Resend client
-// ─────────────────────────────────────────────────────────────────────────────
-let _resend = null;
-function getResend() {
-  if (!_resend) {
-    try {
-      const { Resend } = require('resend');
-      _resend = new Resend(process.env.RESEND_API_KEY);
-    } catch {
-      throw new Error('resend package not installed — run: npm install resend');
-    }
-  }
-  return _resend;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // SMTP transporter (Gmail)
 // ─────────────────────────────────────────────────────────────────────────────
 let smtpTransporter = null;
@@ -107,7 +87,7 @@ async function initSMTP() {
   });
 
   // Railway blocks outbound SMTP (port 587) — skip the live verify in
-  // production to avoid a noisy timeout in the startup log.
+  // production to avoid a 30s timeout in the startup log.
   // SendGrid handles all production email anyway.
   if (process.env.NODE_ENV === 'production') {
     console.log('   ℹ  Gmail SMTP configured (verify skipped in production — Railway blocks port 587)');
@@ -120,7 +100,6 @@ async function initSMTP() {
   } catch (err) {
     console.error('❌ Gmail SMTP failed:', err.message);
     console.warn('   Make sure EMAIL_PASS is a Gmail App Password (16 chars, no spaces).');
-    console.warn('   ⚠  Railway blocks SMTP — use SENDGRID_API_KEY instead.');
     smtpTransporter = null;
   }
 }
@@ -138,10 +117,8 @@ function APP_URL()   { return process.env.APP_URL  || 'http://localhost:3000'; }
 
 function FROM_EMAIL() {
   return (
-    process.env.SENDGRID_FROM  ||
-    process.env.BREVO_FROM     ||
-    process.env.RESEND_FROM    ||
-    process.env.EMAIL_USER     ||
+    process.env.SENDGRID_FROM ||
+    process.env.EMAIL_USER    ||
     'noreply@pgadamis.gov.ph'
   );
 }
@@ -154,8 +131,8 @@ function FROM_ADDRESS() {
 // Boot — runs once on module load
 // ─────────────────────────────────────────────────────────────────────────────
 (async () => {
-  const from = FROM_EMAIL();
-  const labels = { sendgrid: 'SendGrid API', brevo: 'Brevo API', resend: 'Resend API', smtp: 'Gmail SMTP', console: 'Console (fallback)' };
+  const from   = FROM_EMAIL();
+  const labels = { sendgrid: 'SendGrid API', smtp: 'Gmail SMTP', console: 'Console (fallback)' };
 
   if (DRIVER_CHAIN[0] === 'console') {
     console.log('');
@@ -173,20 +150,13 @@ function FROM_ADDRESS() {
   console.log(`✅ Email driver : ${labels[DRIVER_CHAIN[0]]} — from=${from}`);
   console.log(`   Chain        : ${chainStr}`);
 
-  if (DRIVER_CHAIN.includes('smtp')) await initSMTP();
-  if (DRIVER_CHAIN.includes('sendgrid')) {
-    console.log('   ✅ SendGrid: no IP restrictions, 100 emails/day free forever');
-  }
-  if (DRIVER_CHAIN.includes('brevo')) {
-    console.warn('   ⚠  Brevo: if IP errors appear, disable restrictions at');
-    console.warn('      https://app.brevo.com/security/authorised_ips');
-  }
+  if (DRIVER_CHAIN.includes('smtp'))     await initSMTP();
+  if (DRIVER_CHAIN.includes('sendgrid')) console.log('   ✅ SendGrid: no IP restrictions, 100 emails/day free forever');
 })().catch(console.error);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Per-driver send implementations
 // ─────────────────────────────────────────────────────────────────────────────
-
 async function _sendSendGrid({ to, subject, html, text }) {
   const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
     method:  'POST',
@@ -204,7 +174,6 @@ async function _sendSendGrid({ to, subject, html, text }) {
       ],
     }),
   });
-  // SendGrid returns 202 Accepted on success with an empty body
   if (!res.ok) {
     let detail = '';
     try {
@@ -213,30 +182,7 @@ async function _sendSendGrid({ to, subject, html, text }) {
     } catch { detail = res.statusText; }
     throw new Error(`SendGrid ${res.status}: ${detail}`);
   }
-  // Extract message ID from response header (X-Message-Id)
   return res.headers.get('X-Message-Id') || undefined;
-}
-
-async function _sendBrevo({ to, subject, html, text }) {
-  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-    method: 'POST',
-    headers: { 'accept': 'application/json', 'api-key': process.env.BREVO_API_KEY, 'content-type': 'application/json' },
-    body: JSON.stringify({
-      sender: { name: APP_NAME(), email: FROM_EMAIL() },
-      to: [{ email: to }],
-      subject, htmlContent: html, textContent: text,
-    }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(`Brevo ${res.status}: ${data?.message || JSON.stringify(data)}`);
-  return data?.messageId;
-}
-
-async function _sendResend({ to, subject, html, text }) {
-  const resend = getResend();
-  const { data, error } = await resend.emails.send({ from: FROM_ADDRESS(), to: [to], subject, html, text });
-  if (error) throw new Error(`Resend: ${error.message || JSON.stringify(error)}`);
-  return data?.id;
 }
 
 async function _sendSMTP({ to, subject, html, text }) {
@@ -256,20 +202,18 @@ function _sendConsole({ to, subject, text }) {
   console.log('');
 }
 
-const _DRIVER_FN = { sendgrid: _sendSendGrid, brevo: _sendBrevo, resend: _sendResend, smtp: _sendSMTP };
+const _DRIVER_FN = { sendgrid: _sendSendGrid, smtp: _sendSMTP };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Core send — waterfall across the driver chain
 // ─────────────────────────────────────────────────────────────────────────────
 async function _send({ to, subject, html, text }) {
   for (const driver of DRIVER_CHAIN) {
-    // ── Console fallback (always succeeds) ────────────────────────────────────
     if (driver === 'console') {
       _sendConsole({ to, subject, text });
       return { success: true, driver: 'console' };
     }
 
-    // ── Skip drivers that failed permanently this process lifetime ─────────────
     if (_driverHealth[driver] === 'failed') continue;
 
     try {
@@ -282,20 +226,16 @@ async function _send({ to, subject, html, text }) {
         console.error(`⚠️  [emailService] ${driver} permanently degraded: ${err.message}`);
         console.warn(`   → Falling through to next driver in chain.`);
       } else {
-        // Transient error — log and try next driver this time (don't mark as failed)
         console.error(`⚠️  [emailService] ${driver} transient error: ${err.message}`);
         console.warn(`   → Trying next driver.`);
       }
-      // Continue to next driver in chain
     }
   }
-
-  // Should never reach here because console is always last
   return { success: false, driver: 'none' };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Template helpers — keeps individual send functions DRY
+// Template helpers
 // ─────────────────────────────────────────────────────────────────────────────
 function emailWrapper(headerGradient, headerEmoji, headerTitle, headerSub, bodyHtml) {
   const appName = APP_NAME();
@@ -373,7 +313,7 @@ async function sendOTPEmail(toEmail, otp, firstName = 'there') {
     }
     return result;
   } catch (err) {
-    console.error(`❌ [emailService] sendOTPEmail → ${toEmail} | driver=${DRIVER_CHAIN[0]} | ${err.message}`);
+    console.error(`❌ [emailService] sendOTPEmail → ${toEmail} | driver=${DRIVER} | ${err.message}`);
     return { success: false };
   }
 }
@@ -393,7 +333,7 @@ async function sendPasswordResetEmail(toEmail, otp, firstName = 'there') {
     if (result.driver !== 'console') console.log(`  🔑 Password reset sent [${result.driver}] → ${toEmail}`);
     return result;
   } catch (err) {
-    console.error(`❌ [emailService] sendPasswordResetEmail → ${toEmail} | driver=${DRIVER_CHAIN[0]} | ${err.message}`);
+    console.error(`❌ [emailService] sendPasswordResetEmail → ${toEmail} | driver=${DRIVER} | ${err.message}`);
     return { success: false };
   }
 }
@@ -415,7 +355,7 @@ async function sendWelcomeEmail(toEmail, firstName) {
     if (result.driver !== 'console') console.log(`  🎉 Welcome email sent [${result.driver}] → ${toEmail}`);
     return result;
   } catch (err) {
-    console.error(`❌ [emailService] sendWelcomeEmail → ${toEmail} | driver=${DRIVER_CHAIN[0]} | ${err.message}`);
+    console.error(`❌ [emailService] sendWelcomeEmail → ${toEmail} | driver=${DRIVER} | ${err.message}`);
     return { success: false };
   }
 }
@@ -436,7 +376,7 @@ async function sendAccountPendingEmail(toEmail, firstName) {
     if (result.driver !== 'console') console.log(`  ⏳ Account pending email sent [${result.driver}] → ${toEmail}`);
     return result;
   } catch (err) {
-    console.error(`❌ [emailService] sendAccountPendingEmail → ${toEmail} | driver=${DRIVER_CHAIN[0]} | ${err.message}`);
+    console.error(`❌ [emailService] sendAccountPendingEmail → ${toEmail} | driver=${DRIVER} | ${err.message}`);
     return { success: false };
   }
 }
@@ -458,7 +398,7 @@ async function sendAccountApprovedEmail(toEmail, firstName) {
     if (result.driver !== 'console') console.log(`  ✅ Account approved email sent [${result.driver}] → ${toEmail}`);
     return result;
   } catch (err) {
-    console.error(`❌ [emailService] sendAccountApprovedEmail → ${toEmail} | driver=${DRIVER_CHAIN[0]} | ${err.message}`);
+    console.error(`❌ [emailService] sendAccountApprovedEmail → ${toEmail} | driver=${DRIVER} | ${err.message}`);
     return { success: false };
   }
 }
@@ -489,7 +429,7 @@ async function sendAccountRejectedEmail(toEmail, firstName, reason = '') {
     if (result.driver !== 'console') console.log(`  ❌ Account rejected email sent [${result.driver}] → ${toEmail}`);
     return result;
   } catch (err) {
-    console.error(`❌ [emailService] sendAccountRejectedEmail → ${toEmail} | driver=${DRIVER_CHAIN[0]} | ${err.message}`);
+    console.error(`❌ [emailService] sendAccountRejectedEmail → ${toEmail} | driver=${DRIVER} | ${err.message}`);
     return { success: false };
   }
 }
@@ -518,7 +458,7 @@ async function sendContactEmail(toEmail, senderName, senderEmail, subject, messa
     if (result.driver !== 'console') console.log(`  📩 Contact email sent [${result.driver}] → ${toEmail}`);
     return result;
   } catch (err) {
-    console.error(`❌ [emailService] sendContactEmail → ${toEmail} | driver=${DRIVER_CHAIN[0]} | ${err.message}`);
+    console.error(`❌ [emailService] sendContactEmail → ${toEmail} | driver=${DRIVER} | ${err.message}`);
     return { success: false };
   }
 }
@@ -554,7 +494,7 @@ async function sendDormReminderEmail(toEmail, firstName, month, amount) {
     if (result.driver !== 'console') console.log(`  🏠 Dorm reminder sent [${result.driver}] → ${toEmail}`);
     return result;
   } catch (err) {
-    console.error(`❌ [emailService] sendDormReminderEmail → ${toEmail} | driver=${DRIVER_CHAIN[0]} | ${err.message}`);
+    console.error(`❌ [emailService] sendDormReminderEmail → ${toEmail} | driver=${DRIVER} | ${err.message}`);
     return { success: false };
   }
 }
@@ -589,7 +529,7 @@ async function sendBedAssignedEmail(toEmail, firstName, roomNumber, bedNumber) {
     if (result.driver !== 'console') console.log(`  🏠 Bed assigned email sent [${result.driver}] → ${toEmail}`);
     return result;
   } catch (err) {
-    console.error(`❌ [emailService] sendBedAssignedEmail → ${toEmail} | driver=${DRIVER_CHAIN[0]} | ${err.message}`);
+    console.error(`❌ [emailService] sendBedAssignedEmail → ${toEmail} | driver=${DRIVER} | ${err.message}`);
     return { success: false };
   }
 }
@@ -614,7 +554,7 @@ async function sendBedUnassignedEmail(toEmail, firstName, roomNumber, bedNumber)
     if (result.driver !== 'console') console.log(`  🏠 Bed unassigned email sent [${result.driver}] → ${toEmail}`);
     return result;
   } catch (err) {
-    console.error(`❌ [emailService] sendBedUnassignedEmail → ${toEmail} | driver=${DRIVER_CHAIN[0]} | ${err.message}`);
+    console.error(`❌ [emailService] sendBedUnassignedEmail → ${toEmail} | driver=${DRIVER} | ${err.message}`);
     return { success: false };
   }
 }
