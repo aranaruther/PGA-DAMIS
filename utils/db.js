@@ -19,6 +19,8 @@
 
 const Database = require('better-sqlite3');
 const path     = require('path');
+const { randomUUID } = require('crypto');
+const log      = require('./logger');
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..');
 const db = new Database(path.join(DATA_DIR, 'connecthub.db'));
@@ -339,39 +341,55 @@ db.exec(`
 `);
 
 // ── Safe migrations (ALTER TABLE is idempotent via try/catch) ─────────
-try { db.prepare(`ALTER TABLE posts ADD COLUMN status TEXT DEFAULT 'approved'`).run(); } catch (_) {}
+// SQLite throws "duplicate column name" when a column already exists — that is
+// the expected case on every restart after the first.  Any *other* error
+// (wrong SQL, disk full, corrupt DB) is unexpected and logged as a warning so
+// it doesn't silently swallow a real problem.
+function migrate(sql) {
+  try { db.prepare(sql).run(); } catch (e) {
+    const msg = e.message || '';
+    const expected = msg.includes('duplicate column name') ||
+                     msg.includes('already exists') ||
+                     msg.includes('no such table: sqlite_master'); // harmless race
+    if (!expected) log.warn(`[db] Migration warning — ${msg} | SQL: ${sql.slice(0, 80)}`);
+  }
+}
+
+migrate(`ALTER TABLE posts ADD COLUMN status TEXT DEFAULT 'approved'`);
 // account_status: 'pending'=awaiting approval, 'approved'=active, 'rejected'=declined
 // Existing users default to 'approved' so nothing breaks on upgrade
-try { db.prepare(`ALTER TABLE users ADD COLUMN account_status TEXT DEFAULT 'approved'`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE rejected_registrations ADD COLUMN password_hash TEXT DEFAULT NULL`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE rejected_registrations ADD COLUMN cert_residency_url  TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE rejected_registrations ADD COLUMN cert_low_income_url TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE rejected_registrations ADD COLUMN cert_enrollment_url TEXT DEFAULT ''`).run(); } catch (_) {}
+migrate(`ALTER TABLE users ADD COLUMN account_status TEXT DEFAULT 'approved'`);
+migrate(`ALTER TABLE rejected_registrations ADD COLUMN password_hash TEXT DEFAULT NULL`);
+migrate(`ALTER TABLE rejected_registrations ADD COLUMN cert_residency_url  TEXT DEFAULT ''`);
+migrate(`ALTER TABLE rejected_registrations ADD COLUMN cert_low_income_url TEXT DEFAULT ''`);
+migrate(`ALTER TABLE rejected_registrations ADD COLUMN cert_enrollment_url TEXT DEFAULT ''`);
 // ── Fields that were missing from rejected_registrations snapshot ──
-try { db.prepare(`ALTER TABLE rejected_registrations ADD COLUMN civil_status      TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE rejected_registrations ADD COLUMN present_address   TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE rejected_registrations ADD COLUMN permanent_address TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE rejected_registrations ADD COLUMN school_name       TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE rejected_registrations ADD COLUMN school_address    TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE rejected_registrations ADD COLUMN year_level        TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE rejected_registrations ADD COLUMN course            TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE rejected_registrations ADD COLUMN avatar_face_x     INTEGER DEFAULT 50`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE rejected_registrations ADD COLUMN avatar_face_y     INTEGER DEFAULT 50`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE rejected_registrations ADD COLUMN father_info       TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE rejected_registrations ADD COLUMN mother_info       TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE rejected_registrations ADD COLUMN monthly_income    TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE rejected_registrations ADD COLUMN specialization    TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE posts ADD COLUMN moderated_by TEXT DEFAULT NULL`).run(); } catch (_) {}    // 'ai' | 'admin' | NULL
-try { db.prepare(`ALTER TABLE posts ADD COLUMN ai_reviewed_at TEXT DEFAULT NULL`).run(); } catch (_) {}  // set when AI reviews (even if no action taken)
-try { db.prepare(`ALTER TABLE comments ADD COLUMN parent_id TEXT DEFAULT NULL`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE messages ADD COLUMN image_url TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE dorm_billing ADD COLUMN user_comment TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`CREATE TABLE IF NOT EXISTS friendships (id TEXT PRIMARY KEY, user_a TEXT NOT NULL, user_b TEXT NOT NULL, status TEXT DEFAULT 'pending', requester TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')), UNIQUE(user_a, user_b))`).run(); } catch (_) {}
+migrate(`ALTER TABLE rejected_registrations ADD COLUMN civil_status      TEXT DEFAULT ''`);
+migrate(`ALTER TABLE rejected_registrations ADD COLUMN present_address   TEXT DEFAULT ''`);
+migrate(`ALTER TABLE rejected_registrations ADD COLUMN permanent_address TEXT DEFAULT ''`);
+migrate(`ALTER TABLE rejected_registrations ADD COLUMN school_name       TEXT DEFAULT ''`);
+migrate(`ALTER TABLE rejected_registrations ADD COLUMN school_address    TEXT DEFAULT ''`);
+migrate(`ALTER TABLE rejected_registrations ADD COLUMN year_level        TEXT DEFAULT ''`);
+migrate(`ALTER TABLE rejected_registrations ADD COLUMN course            TEXT DEFAULT ''`);
+migrate(`ALTER TABLE rejected_registrations ADD COLUMN avatar_face_x     INTEGER DEFAULT 50`);
+migrate(`ALTER TABLE rejected_registrations ADD COLUMN avatar_face_y     INTEGER DEFAULT 50`);
+migrate(`ALTER TABLE rejected_registrations ADD COLUMN father_info       TEXT DEFAULT ''`);
+migrate(`ALTER TABLE rejected_registrations ADD COLUMN mother_info       TEXT DEFAULT ''`);
+migrate(`ALTER TABLE rejected_registrations ADD COLUMN monthly_income    TEXT DEFAULT ''`);
+migrate(`ALTER TABLE rejected_registrations ADD COLUMN specialization    TEXT DEFAULT ''`);
+migrate(`ALTER TABLE posts ADD COLUMN moderated_by TEXT DEFAULT NULL`);    // 'ai' | 'admin' | NULL
+migrate(`ALTER TABLE posts ADD COLUMN ai_reviewed_at TEXT DEFAULT NULL`);  // set when AI reviews (even if no action taken)
+migrate(`ALTER TABLE comments ADD COLUMN parent_id TEXT DEFAULT NULL`);
+migrate(`ALTER TABLE messages ADD COLUMN image_url TEXT DEFAULT ''`);
+migrate(`ALTER TABLE dorm_billing ADD COLUMN user_comment TEXT DEFAULT ''`);
+migrate(`CREATE TABLE IF NOT EXISTS friendships (id TEXT PRIMARY KEY, user_a TEXT NOT NULL, user_b TEXT NOT NULL, status TEXT DEFAULT 'pending', requester TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')), UNIQUE(user_a, user_b))`);
 
 // ── PGA-DAMIS v1 migrations — new resident application fields ─────────
-try { db.prepare(`ALTER TABLE users ADD COLUMN civil_status       TEXT DEFAULT ''`).run(); } catch (_) {}
+migrate(`ALTER TABLE users ADD COLUMN civil_status       TEXT DEFAULT ''`);
 
 // ── Dormitory Management Tables ────────────────────────────────────
+// CREATE TABLE IF NOT EXISTS never throws "already exists" in SQLite — the
+// try/catch here guards only the seeder logic inside, not the DDL itself.
 try {
   db.prepare(`CREATE TABLE IF NOT EXISTS dorm_rooms (
     id          INTEGER PRIMARY KEY,
@@ -390,81 +408,75 @@ try {
       for (let i = 1;  i <= 13; i++) seedRoom.run(i, 'female');
       for (let i = 14; i <= 26; i++) seedRoom.run(i, 'male');
     })();
-    console.log('[db] Seeded 26 default dorm rooms (first-run only).');
+    log.info('[db] Seeded 26 default dorm rooms (first-run only).');
   }
-} catch (_) {}
+} catch (e) {
+  log.warn(`[db] dorm_rooms setup error: ${e.message}`);
+}
 
-try {
-  db.prepare(`CREATE TABLE IF NOT EXISTS bed_assignments (
-    id          TEXT PRIMARY KEY,
-    room_id     INTEGER NOT NULL REFERENCES dorm_rooms(id),
-    bed_number  INTEGER NOT NULL,
-    user_id     TEXT NOT NULL REFERENCES users(id),
-    assigned_at TEXT DEFAULT (datetime('now')),
-    assigned_by TEXT,
-    notes       TEXT DEFAULT '',
-    UNIQUE(room_id, bed_number),
-    UNIQUE(user_id)
-  )`).run();
-} catch (_) {}
+db.prepare(`CREATE TABLE IF NOT EXISTS bed_assignments (
+  id          TEXT PRIMARY KEY,
+  room_id     INTEGER NOT NULL REFERENCES dorm_rooms(id),
+  bed_number  INTEGER NOT NULL,
+  user_id     TEXT NOT NULL REFERENCES users(id),
+  assigned_at TEXT DEFAULT (datetime('now')),
+  assigned_by TEXT,
+  notes       TEXT DEFAULT '',
+  UNIQUE(room_id, bed_number),
+  UNIQUE(user_id)
+)`).run();
 
-try {
-  db.prepare(`CREATE TABLE IF NOT EXISTS dorm_billing (
-    id          TEXT PRIMARY KEY,
-    user_id     TEXT NOT NULL REFERENCES users(id),
-    month       TEXT NOT NULL,
-    amount      REAL NOT NULL DEFAULT 200,
-    status      TEXT NOT NULL DEFAULT 'unpaid' CHECK(status IN ('unpaid','paid','waived')),
-    paid_at     TEXT,
-    created_at  TEXT DEFAULT (datetime('now')),
-    notes       TEXT DEFAULT '',
-    UNIQUE(user_id, month)
-  )`).run();
-} catch (_) {}
-try { db.prepare(`ALTER TABLE users ADD COLUMN present_address    TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE users ADD COLUMN permanent_address  TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE users ADD COLUMN school_name        TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE users ADD COLUMN course             TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE users ADD COLUMN year_level         TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE users ADD COLUMN school_address     TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE users ADD COLUMN father_info        TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE users ADD COLUMN mother_info        TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE users ADD COLUMN monthly_income     TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE users ADD COLUMN avatar_face_x      INTEGER DEFAULT 50`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE users ADD COLUMN avatar_face_y      INTEGER DEFAULT 50`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE users ADD COLUMN specialization     TEXT DEFAULT ''`).run(); } catch (_) {}
+db.prepare(`CREATE TABLE IF NOT EXISTS dorm_billing (
+  id          TEXT PRIMARY KEY,
+  user_id     TEXT NOT NULL REFERENCES users(id),
+  month       TEXT NOT NULL,
+  amount      REAL NOT NULL DEFAULT 200,
+  status      TEXT NOT NULL DEFAULT 'unpaid' CHECK(status IN ('unpaid','paid','waived')),
+  paid_at     TEXT,
+  created_at  TEXT DEFAULT (datetime('now')),
+  notes       TEXT DEFAULT '',
+  UNIQUE(user_id, month)
+)`).run();
+migrate(`ALTER TABLE users ADD COLUMN present_address    TEXT DEFAULT ''`);
+migrate(`ALTER TABLE users ADD COLUMN permanent_address  TEXT DEFAULT ''`);
+migrate(`ALTER TABLE users ADD COLUMN school_name        TEXT DEFAULT ''`);
+migrate(`ALTER TABLE users ADD COLUMN course             TEXT DEFAULT ''`);
+migrate(`ALTER TABLE users ADD COLUMN year_level         TEXT DEFAULT ''`);
+migrate(`ALTER TABLE users ADD COLUMN school_address     TEXT DEFAULT ''`);
+migrate(`ALTER TABLE users ADD COLUMN father_info        TEXT DEFAULT ''`);
+migrate(`ALTER TABLE users ADD COLUMN mother_info        TEXT DEFAULT ''`);
+migrate(`ALTER TABLE users ADD COLUMN monthly_income     TEXT DEFAULT ''`);
+migrate(`ALTER TABLE users ADD COLUMN avatar_face_x      INTEGER DEFAULT 50`);
+migrate(`ALTER TABLE users ADD COLUMN avatar_face_y      INTEGER DEFAULT 50`);
+migrate(`ALTER TABLE users ADD COLUMN specialization     TEXT DEFAULT ''`);
 // ── PGA-DAMIS cert doc columns on id_verification_requests ────────────
-try { db.prepare(`ALTER TABLE id_verification_requests ADD COLUMN cert_residency_url   TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE id_verification_requests ADD COLUMN cert_low_income_url  TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`ALTER TABLE id_verification_requests ADD COLUMN cert_enrollment_url  TEXT DEFAULT ''`).run(); } catch (_) {}
-try { db.prepare(`CREATE TABLE IF NOT EXISTS message_reactions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, message_id TEXT NOT NULL, emoji TEXT NOT NULL DEFAULT 'like', created_at TEXT DEFAULT (datetime('now')), UNIQUE(user_id, message_id))`).run(); } catch (_) {}
+migrate(`ALTER TABLE id_verification_requests ADD COLUMN cert_residency_url   TEXT DEFAULT ''`);
+migrate(`ALTER TABLE id_verification_requests ADD COLUMN cert_low_income_url  TEXT DEFAULT ''`);
+migrate(`ALTER TABLE id_verification_requests ADD COLUMN cert_enrollment_url  TEXT DEFAULT ''`);
+migrate(`CREATE TABLE IF NOT EXISTS message_reactions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, message_id TEXT NOT NULL, emoji TEXT NOT NULL DEFAULT 'like', created_at TEXT DEFAULT (datetime('now')), UNIQUE(user_id, message_id))`);
 
 // ── Reputation votes (one vote per voter per target, can be +1 or -1) ──
-try {
-  db.prepare(`CREATE TABLE IF NOT EXISTS reputation_votes (
-    id         TEXT PRIMARY KEY,
-    voter_id   TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    target_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    value      INTEGER NOT NULL CHECK(value IN (1, -1)),
-    created_at TEXT DEFAULT (datetime('now')),
-    UNIQUE(voter_id, target_id)
-  )`).run();
-} catch (_) {}
+db.prepare(`CREATE TABLE IF NOT EXISTS reputation_votes (
+  id         TEXT PRIMARY KEY,
+  voter_id   TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  target_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  value      INTEGER NOT NULL CHECK(value IN (1, -1)),
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(voter_id, target_id)
+)`).run();
 
 // ── User reports (anonymous reports against a user) ─────────────────
-try {
-  db.prepare(`CREATE TABLE IF NOT EXISTS user_reports (
-    id          TEXT PRIMARY KEY,
-    reporter_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    target_id   TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    reason      TEXT NOT NULL,
-    details     TEXT DEFAULT '',
-    status      TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','reviewed','dismissed')),
-    admin_note  TEXT DEFAULT '',
-    created_at  TEXT DEFAULT (datetime('now')),
-    reviewed_at TEXT
-  )`).run();
-} catch (_) {}
+db.prepare(`CREATE TABLE IF NOT EXISTS user_reports (
+  id          TEXT PRIMARY KEY,
+  reporter_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  target_id   TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  reason      TEXT NOT NULL,
+  details     TEXT DEFAULT '',
+  status      TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','reviewed','dismissed')),
+  admin_note  TEXT DEFAULT '',
+  created_at  TEXT DEFAULT (datetime('now')),
+  reviewed_at TEXT
+)`).run();
 
 // ══════════════════════════════════════════════════════
 // HELPERS
@@ -1651,7 +1663,6 @@ function getDormRooms() {
 }
 
 function assignBed(roomId, bedNumber, userId, assignedBy, notes) {
-  const { randomUUID } = require('crypto');
   return db.prepare(
     'INSERT INTO bed_assignments (id, room_id, bed_number, user_id, assigned_by, notes) VALUES (?, ?, ?, ?, ?, ?)'
   ).run(randomUUID(), roomId, bedNumber, userId, assignedBy, notes||'');
@@ -1675,7 +1686,6 @@ function getDormBilling(month) {
 }
 
 function generateMonthlyBills(month, { updateExisting = false } = {}) {
-  const { randomUUID } = require('crypto');
   const rate = parseInt(getSetting('dorm_rate', '200'), 10) || 200;
   const assigned = db.prepare('SELECT user_id FROM bed_assignments').all();
   let created = 0, updated = 0, skipped = 0;
@@ -1707,7 +1717,6 @@ function generateMonthlyBills(month, { updateExisting = false } = {}) {
 
 // Auto-generate a single bill for one user (called on bed assignment)
 function generateBillForUser(userId, month) {
-  const { randomUUID } = require('crypto');
   const rate = parseInt(getSetting('dorm_rate', '200'), 10) || 200;
   const result = db.prepare(
     'INSERT OR IGNORE INTO dorm_billing (id, user_id, month, amount) VALUES (?, ?, ?, ?)'
@@ -1821,45 +1830,41 @@ function getReportCountByUser() {
 }
 
 // ── Maintenance Requests ────────────────────────────────────────────────────
-try {
-  db.prepare(`CREATE TABLE IF NOT EXISTS maintenance_requests (
-    id          TEXT PRIMARY KEY,
-    user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    category    TEXT NOT NULL DEFAULT 'general',
-    title       TEXT NOT NULL,
-    description TEXT NOT NULL,
-    location    TEXT,
-    priority    TEXT NOT NULL DEFAULT 'normal',  -- low | normal | high | urgent
-    status      TEXT NOT NULL DEFAULT 'open',    -- open | in_progress | resolved | closed
-    admin_note  TEXT,
-    created_at  TEXT DEFAULT (datetime('now')),
-    updated_at  TEXT DEFAULT (datetime('now')),
-    resolved_at TEXT
-  )`).run();
-} catch (_) {}
+db.prepare(`CREATE TABLE IF NOT EXISTS maintenance_requests (
+  id          TEXT PRIMARY KEY,
+  user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  category    TEXT NOT NULL DEFAULT 'general',
+  title       TEXT NOT NULL,
+  description TEXT NOT NULL,
+  location    TEXT,
+  priority    TEXT NOT NULL DEFAULT 'normal',  -- low | normal | high | urgent
+  status      TEXT NOT NULL DEFAULT 'open',    -- open | in_progress | resolved | closed
+  admin_note  TEXT,
+  created_at  TEXT DEFAULT (datetime('now')),
+  updated_at  TEXT DEFAULT (datetime('now')),
+  resolved_at TEXT
+)`).run();
 
 // ── Utility Bills ─────────────────────────────────────────────────────────────
-try {
-  db.prepare(`CREATE TABLE IF NOT EXISTS utility_bills (
-    id          TEXT PRIMARY KEY,
-    month       TEXT NOT NULL,               -- YYYY-MM
-    type        TEXT NOT NULL,               -- electricity | water
-    amount      REAL NOT NULL DEFAULT 0,
-    unit_used   REAL,                        -- kWh or cubic meters
-    note        TEXT,
-    created_at  TEXT DEFAULT (datetime('now')),
-    updated_at  TEXT DEFAULT (datetime('now'))
-  )`).run();
-  db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS uniq_utility_month_type ON utility_bills(month, type)`).run();
-} catch (_) {}
+db.prepare(`CREATE TABLE IF NOT EXISTS utility_bills (
+  id          TEXT PRIMARY KEY,
+  month       TEXT NOT NULL,               -- YYYY-MM
+  type        TEXT NOT NULL,               -- electricity | water
+  amount      REAL NOT NULL DEFAULT 0,
+  unit_used   REAL,                        -- kWh or cubic meters
+  note        TEXT,
+  created_at  TEXT DEFAULT (datetime('now')),
+  updated_at  TEXT DEFAULT (datetime('now'))
+)`).run();
+db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS uniq_utility_month_type ON utility_bills(month, type)`).run();
 
 // ── v2 feature migrations ─────────────────────────────────────────────────────
 // maintenance image attachment
-try { db.prepare(`ALTER TABLE maintenance_requests ADD COLUMN image_url TEXT DEFAULT ''`).run(); } catch (_) {}
+migrate(`ALTER TABLE maintenance_requests ADD COLUMN image_url TEXT DEFAULT ''`);
 // GCash receipt attached by resident to a billing record
-try { db.prepare(`ALTER TABLE dorm_billing ADD COLUMN receipt_url TEXT DEFAULT ''`).run(); } catch (_) {}
+migrate(`ALTER TABLE dorm_billing ADD COLUMN receipt_url TEXT DEFAULT ''`);
 // Utility bill scan / proof-of-billing image
-try { db.prepare(`ALTER TABLE utility_bills ADD COLUMN image_url TEXT DEFAULT ''`).run(); } catch (_) {}
+migrate(`ALTER TABLE utility_bills ADD COLUMN image_url TEXT DEFAULT ''`);
 
 
 function createMaintenanceRequest({ userId, category, title, description, location, priority, imageUrl = '' }) {

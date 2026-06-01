@@ -48,8 +48,34 @@ const io         = new Server(httpServer);
 app.set('io', io);
 
 // ── Security headers ──────────────────────────────────
-app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors());
+// CSP covers all known external origins: Cloudinary (images), Google (OAuth/fonts),
+// Socket.IO (ws:), and the Railway-assigned domain.
+// Adjust ALLOWED_ORIGIN in Railway env vars if your public URL changes.
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc:  ["'self'"],
+      scriptSrc:   ["'self'", "'unsafe-inline'"],   // vanilla JS in .html files
+      styleSrc:    ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc:     ["'self'", 'https://fonts.gstatic.com'],
+      imgSrc:      ["'self'", 'data:', 'blob:', 'https://res.cloudinary.com'],
+      connectSrc:  ["'self'", 'wss:', 'ws:', 'https://res.cloudinary.com'],
+      frameSrc:    ["'none'"],
+      objectSrc:   ["'none'"],
+      baseUri:     ["'self'"],
+    },
+  },
+}));
+
+// CORS: allow only the configured origin (or same-origin for direct API calls).
+// Set ALLOWED_ORIGIN=https://your-app.railway.app in Railway env vars.
+// In dev (no ALLOWED_ORIGIN set) cors() is still applied but Railway's reverse
+// proxy already handles the domain — this keeps things working locally too.
+const CORS_ORIGIN = process.env.ALLOWED_ORIGIN || false;
+app.use(cors({
+  origin:      CORS_ORIGIN,
+  credentials: true,
+}));
 
 // ── Rate limiting ─────────────────────────────────────
 const authLimiter = rateLimit({
@@ -110,6 +136,13 @@ app.use(express.urlencoded({ extended: true }));
 app.set('trust proxy', 1);
 
 // ── Sessions ──────────────────────────────────────────
+// SESSION_SECRET must be set in production — a missing secret means sessions
+// can be trivially forged.  Fail loudly at boot rather than silently degrading.
+if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
+  log.error('FATAL: SESSION_SECRET env var is not set. Refusing to start in production without it.');
+  process.exit(1);
+}
+
 // better-sqlite3-session-store already lives in package.json and shares the
 // same DB file as the rest of the app.  The 'sessions' table is created
 // automatically on first boot.  TTL matches cookie maxAge; expired rows are
@@ -125,7 +158,7 @@ app.use(session({
       intervalMs: 15 * 60 * 1000, // prune expired rows every 15 min
     },
   }),
-  secret: process.env.SESSION_SECRET || 'fallback-dev-secret',
+  secret: process.env.SESSION_SECRET || 'fallback-dev-secret-change-me',
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -363,7 +396,8 @@ app.get('*', (req, res) => {
 app.use((err, req, res, next) => {
   if (err.code === 'LIMIT_FILE_SIZE')
     return res.status(400).json({ error: 'File too large. Maximum size is 5 MB.' });
-  console.error('Unhandled error:', err.message);
+  res._errMsg = err.message;
+  log.error(`Unhandled express error on ${req.method} ${req.path}: ${err.stack || err.message}`);
   res.status(500).json({ error: 'Server error. Please try again.' });
 });
 
@@ -371,17 +405,18 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, async () => {
   const env = process.env.NODE_ENV || 'development';
-  console.log('\x1b[36m\x1b[1m');
-  console.log('╔══════════════════════════════════════════════════════════╗');
-  console.log('║    PGA-DAMIS  —  Dormitory Application & Management  🏛️  ║');
-  console.log('║         Provincial Government of Aurora                  ║');
-  console.log('╚══════════════════════════════════════════════════════════╝');
-  console.log('\x1b[0m');
+  log.info('\x1b[36m\x1b[1m');
+  log.info('╔══════════════════════════════════════════════════════════╗');
+  log.info('║    PGA-DAMIS  —  Dormitory Application & Management  🏛️  ║');
+  log.info('║         Provincial Government of Aurora                  ║');
+  log.info('╚══════════════════════════════════════════════════════════╝');
+  log.info('\x1b[0m');
   log.success(`Server listening on http://localhost:${PORT}`);
   log.success(`Admin panel    →  http://localhost:${PORT}/admin.html`);
   log.success(`Resident portal→  http://localhost:${PORT}/`);
   log.info(`Environment  : ${env} | Node ${process.version}`);
   log.info(`Sessions     : ✔ SQLite store (connecthub.db → sessions table)`);
+  log.info(`CORS         : ${CORS_ORIGIN ? `✔ Locked to ${CORS_ORIGIN}` : '⚠ Open (set ALLOWED_ORIGIN in production)'}`);
   log.info(`Cloudinary   : ${process.env.CLOUDINARY_CLOUD_NAME ? '✔ configured' : '✖ NOT configured (base64 fallback)'}`);
   log.info(`Google OAuth : ${process.env.GOOGLE_CLIENT_ID      ? '✔ configured' : '✖ NOT configured'}`);
   const geminiPool   = require('./utils/geminiPool');
@@ -492,5 +527,17 @@ function shutdown(signal) {
 }
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT',  () => shutdown('SIGINT'));
+
+// ── Safety nets: log before Railway restarts the container ────────────
+// Without these, unhandled async errors produce no log line and Railway shows
+// only a bare "process exited" event, making root-cause analysis very hard.
+process.on('unhandledRejection', (reason) => {
+  log.error(`Unhandled promise rejection: ${reason?.stack || reason}`);
+  shutdown('unhandledRejection');
+});
+process.on('uncaughtException', (err) => {
+  log.error(`Uncaught exception: ${err.stack || err.message}`);
+  shutdown('uncaughtException');
+});
 
 module.exports = app;
