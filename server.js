@@ -110,7 +110,21 @@ app.use(express.urlencoded({ extended: true }));
 app.set('trust proxy', 1);
 
 // ── Sessions ──────────────────────────────────────────
+// better-sqlite3-session-store already lives in package.json and shares the
+// same DB file as the rest of the app.  The 'sessions' table is created
+// automatically on first boot.  TTL matches cookie maxAge; expired rows are
+// pruned on the interval below so the table doesn't grow unboundedly.
+const SqliteStore       = require('better-sqlite3-session-store')(session);
+const { db: sessionDb } = require('./utils/db');
+
 app.use(session({
+  store: new SqliteStore({
+    client: sessionDb,
+    expired: {
+      clear:      true,
+      intervalMs: 15 * 60 * 1000, // prune expired rows every 15 min
+    },
+  }),
   secret: process.env.SESSION_SECRET || 'fallback-dev-secret',
   resave: false,
   saveUninitialized: false,
@@ -367,6 +381,7 @@ httpServer.listen(PORT, async () => {
   log.success(`Admin panel    →  http://localhost:${PORT}/admin.html`);
   log.success(`Resident portal→  http://localhost:${PORT}/`);
   log.info(`Environment  : ${env} | Node ${process.version}`);
+  log.info(`Sessions     : ✔ SQLite store (connecthub.db → sessions table)`);
   log.info(`Cloudinary   : ${process.env.CLOUDINARY_CLOUD_NAME ? '✔ configured' : '✖ NOT configured (base64 fallback)'}`);
   log.info(`Google OAuth : ${process.env.GOOGLE_CLIENT_ID      ? '✔ configured' : '✖ NOT configured'}`);
   const geminiPool   = require('./utils/geminiPool');
