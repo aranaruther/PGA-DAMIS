@@ -83,8 +83,8 @@
 
     <div class="nav-section mt-2">Dormitory</div>
     <div class="nav-item" id="nav-registrations" onclick="showTab('registrations')"><i class="fa-solid fa-user-plus w-4"></i>Applications <span id="reg-badge" class="ml-auto text-xs bg-red-500 text-white rounded-full px-1.5 py-0.5 hidden">0</span></div>
-    <div class="nav-item" id="nav-users" onclick="showTab('users')"><i class="fa-solid fa-users w-4"></i>Residents</div>
     <div class="nav-item" id="nav-dormitory" onclick="showTab('dormitory')"><i class="fa-solid fa-door-open w-4"></i>Room Management</div>
+    <div class="nav-item" id="nav-users" onclick="showTab('users')"><i class="fa-solid fa-users w-4"></i>Residents</div>
     <div class="nav-item" id="nav-billing" onclick="showTab('billing')"><i class="fa-solid fa-peso-sign w-4"></i>Billing</div>
     <div class="nav-item" id="nav-maintenance" onclick="showTab('maintenance')"><i class="fa-solid fa-screwdriver-wrench w-4"></i>Maintenance <span id="maint-badge" class="ml-auto text-xs bg-orange-500 text-white rounded-full px-1.5 py-0.5 hidden">0</span></div>
     <div class="nav-item" id="nav-utility" onclick="showTab('utility')"><i class="fa-solid fa-bolt w-4"></i>Utility Bills</div>
@@ -97,6 +97,7 @@
     <div class="nav-section mt-2">System</div>
     <div class="nav-item" id="nav-logs" onclick="showTab('logs')"><i class="fa-solid fa-list-check w-4"></i>Audit Logs</div>
     <div class="nav-item" id="nav-ai-log" onclick="showTab('ai-log')"><i class="fa-solid fa-robot w-4"></i>AI Log</div>
+    <div class="nav-item" id="nav-backup" onclick="showTab('backup')"><i class="fa-solid fa-database w-4"></i>Backup &amp; Restore</div>
   </nav>
   <div class="p-3 border-t border-white/10 space-y-1">
     <div id="admin-info" class="flex items-center gap-3 px-3 py-2 rounded-xl bg-white/5 mb-1">
@@ -417,6 +418,26 @@
   <!-- ═══ ID VERIFICATION ═══ -->
   <!-- ═══ USERS ═══ -->
   <div id="tab-users" class="tab-content">
+    <!-- ── Semester control bar ── -->
+    <div id="semester-control-bar" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-3 mb-4 flex flex-wrap items-center gap-3">
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-calendar-days text-brand-500 text-sm"></i>
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Semester</span>
+      </div>
+      <select id="sem-select" class="text-sm font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 outline-none text-slate-800 dark:text-slate-100">
+        <option>1st Semester</option>
+        <option>2nd Semester</option>
+        <option>Midyear</option>
+      </select>
+      <input id="sem-year" type="number" min="2020" max="2099" placeholder="Year" class="w-24 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 outline-none text-slate-800 dark:text-slate-100"/>
+      <div class="flex items-center gap-2">
+        <span class="text-xs text-slate-500">Valid to:</span>
+        <input id="sem-valid-to" type="date" class="text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 outline-none text-slate-800 dark:text-slate-100"/>
+      </div>
+      <button onclick="saveSemesterSettings()" class="text-xs font-semibold bg-brand-600 hover:bg-brand-700 text-white px-3 py-1.5 rounded-xl transition-colors flex items-center gap-1.5"><i class="fa-solid fa-floppy-disk"></i>Save</button>
+      <button onclick="openRolloverModal()" class="text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-xl transition-colors flex items-center gap-1.5 ml-auto"><i class="fa-solid fa-rotate"></i>New Semester…</button>
+    </div>
+
     <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
       <div><h1 class="font-display font-bold text-2xl text-slate-900 dark:text-slate-100">Resident Management</h1><p id="user-count-text" class="text-sm text-slate-400 mt-0.5"></p></div>
       <div class="flex items-center gap-2 flex-wrap">
@@ -426,7 +447,6 @@
         </div>
         <button onclick="exportResidents('excel')" class="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-green-700 dark:text-green-400 text-sm font-medium px-4 py-2 rounded-xl hover:bg-green-50 transition-colors"><i class="fa-solid fa-file-excel text-xs"></i>Excel</button>
         <button onclick="exportResidents('pdf')" class="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-red-600 dark:text-red-400 text-sm font-medium px-4 py-2 rounded-xl hover:bg-red-50 transition-colors"><i class="fa-solid fa-file-pdf text-xs"></i>PDF</button>
-        <button onclick="showDeletedUsers()" class="flex items-center gap-1.5 text-xs font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 px-3 py-2 rounded-xl border border-red-200 dark:border-red-800 transition-colors"><i class="fa-solid fa-box-archive mr-1"></i>Deleted Archive</button>
       </div>
     </div>
 
@@ -455,32 +475,34 @@
       </div>
     </div>
 
-    <!-- ── Role filter pills ── -->
-    <div class="flex items-center gap-2 mb-4">
-      <button id="um-tab-user"  onclick="setUserRoleFilter('user')"  class="um-role-tab active text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors border-brand-500 bg-brand-50 dark:bg-brand-950/40 text-brand-700 dark:text-brand-300">Residents</button>
-      <button id="um-tab-admin" onclick="setUserRoleFilter('admin')" class="um-role-tab text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors border-slate-200 dark:border-slate-700 text-slate-500 hover:border-purple-300">Admins</button>
+    <!-- ── Role filter pills (now 3 tabs) ── -->
+    <div class="flex items-center gap-2 mb-4 flex-wrap">
+      <button id="um-tab-user"    onclick="setUserRoleFilter('user')"    class="um-role-tab active text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors border-brand-500 bg-brand-50 dark:bg-brand-950/40 text-brand-700 dark:text-brand-300">Residents</button>
+      <button id="um-tab-admin"   onclick="setUserRoleFilter('admin')"   class="um-role-tab text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors border-slate-200 dark:border-slate-700 text-slate-500 hover:border-purple-300">Admins</button>
+      <button id="um-tab-deleted" onclick="setUserRoleFilter('deleted')" class="um-role-tab text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors border-slate-200 dark:border-slate-700 text-slate-500 hover:border-red-300 flex items-center gap-1.5"><i class="fa-solid fa-box-archive text-[10px]"></i>Deleted Archive</button>
       <span class="ml-auto text-xs text-slate-400" id="um-filter-count"></span>
     </div>
-    <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-visible">
+
+    <!-- ── Active residents / admins table ── -->
+    <div id="um-live-table" class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-visible">
       <div class="overflow-x-auto" style="overflow-y:visible">
         <table class="w-full text-sm" style="overflow:visible">
           <thead><tr class="text-left text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider sticky top-0 bg-white dark:bg-slate-900 z-10 shadow-sm">
             <th class="px-4 py-3 font-semibold cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200 whitespace-nowrap" onclick="sortUsers('surname')">
               Resident <i id="sort-icon-surname" class="fa-solid fa-sort text-slate-300 ml-1"></i></th>
-            
             <th class="px-4 py-3 font-semibold cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200 whitespace-nowrap" onclick="sortUsers('room')">
               Room <i id="sort-icon-room" class="fa-solid fa-sort text-slate-300 ml-1"></i></th>
             <th class="px-4 py-3 font-semibold cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200 whitespace-nowrap" onclick="sortUsers('municipality')">
               Municipality <i id="sort-icon-municipality" class="fa-solid fa-sort text-slate-300 ml-1"></i></th>
             <th class="px-4 py-3 font-semibold cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200 whitespace-nowrap" onclick="sortUsers('yearlevel')">
               Year Level <i id="sort-icon-yearlevel" class="fa-solid fa-sort text-slate-300 ml-1"></i></th>
-            
             <th class="px-4 py-3 font-semibold cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200 whitespace-nowrap" onclick="sortUsers('reputation')">
               Reputation <i id="sort-icon-reputation" class="fa-solid fa-sort text-slate-300 ml-1"></i></th>
             <th class="px-4 py-3 font-semibold cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200 whitespace-nowrap" onclick="sortUsers('reports')">
               Reports <i id="sort-icon-reports" class="fa-solid fa-sort text-slate-300 ml-1"></i></th>
             <th class="px-4 py-3 font-semibold cursor-pointer select-none hover:text-slate-700 dark:hover:text-slate-200 whitespace-nowrap" onclick="sortUsers('joined')">
               Joined <i id="sort-icon-joined" class="fa-solid fa-sort text-slate-300 ml-1"></i></th>
+            <th class="px-4 py-3 font-semibold whitespace-nowrap">Slip</th>
             <th class="px-4 py-3 font-semibold">Actions</th>
           </tr></thead>
           <tbody id="users-tbody"></tbody>
@@ -488,19 +510,25 @@
       </div>
     </div>
 
-    <!-- Deleted Users Archive Panel -->
-    <div id="deleted-users-panel" class="hidden mt-6">
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="font-bold text-lg text-slate-800 dark:text-slate-100 flex items-center gap-2"><i class="fa-solid fa-box-archive text-red-400"></i>Deleted Users Archive</h2>
-        <button onclick="document.getElementById('deleted-users-panel').classList.add('hidden')" class="text-xs text-slate-400 hover:text-slate-600 px-3 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Hide</button>
-      </div>
+    <!-- ── Deleted Archive table (shown when tab=deleted) ── -->
+    <div id="um-deleted-table" class="hidden">
       <div class="bg-white dark:bg-slate-900 rounded-2xl border border-red-100 dark:border-red-900/40 overflow-hidden">
-        <div class="overflow-x-auto max-h-[400px]">
+        <div class="flex items-center gap-3 px-5 py-3 border-b border-red-100 dark:border-red-900/40 bg-red-50 dark:bg-red-950/20">
+          <i class="fa-solid fa-box-archive text-red-400"></i>
+          <span class="font-bold text-slate-700 dark:text-slate-200 text-sm">Deleted Users Archive</span>
+          <div class="ml-auto flex items-center gap-2">
+            <label class="text-xs text-slate-500">Filter by semester:</label>
+            <select id="deleted-semester-filter" onchange="filterDeletedBySemester(this.value)" class="text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 outline-none">
+              <option value="">All</option>
+            </select>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
           <table class="w-full text-sm">
-            <thead><tr class="text-left text-xs text-slate-500 uppercase tracking-wider bg-red-50 dark:bg-red-950/30">
+            <thead><tr class="text-left text-xs text-slate-500 uppercase tracking-wider bg-red-50/50 dark:bg-red-950/10">
               <th class="px-4 py-3 font-semibold">User</th>
               <th class="px-4 py-3 font-semibold">Email</th>
-              <th class="px-4 py-3 font-semibold">Role</th>
+              <th class="px-4 py-3 font-semibold">Semester</th>
               <th class="px-4 py-3 font-semibold">Deleted</th>
               <th class="px-4 py-3 font-semibold">Actions</th>
             </tr></thead>
@@ -1076,10 +1104,133 @@
     </div>
   </div>
 
+  <!-- ═══ BACKUP & RESTORE ═══ -->
+  <div id="tab-backup" class="tab-content">
+    <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+      <div>
+        <h1 class="font-display font-bold text-2xl text-slate-900 dark:text-slate-100">Backup &amp; Restore</h1>
+        <p class="text-sm text-slate-400 mt-0.5">Download a snapshot of the database or restore from a previous backup</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl">
+      <!-- Download Backup -->
+      <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-6">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-950/40 flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-download text-green-600 dark:text-green-400"></i>
+          </div>
+          <div>
+            <h2 class="font-bold text-slate-800 dark:text-slate-100">Download Backup</h2>
+            <p class="text-xs text-slate-400">Exports a consistent snapshot</p>
+          </div>
+        </div>
+        <p class="text-sm text-slate-500 dark:text-slate-400 mb-5">
+          Creates a hot backup of the live database using SQLite's built-in backup API. Safe to run while the system is in use — no downtime required.
+        </p>
+        <button onclick="downloadBackup()" id="backup-download-btn"
+          class="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm">
+          <i class="fa-solid fa-database"></i>Download .db Backup
+        </button>
+        <p id="backup-download-status" class="text-xs text-slate-400 mt-2 text-center hidden"></p>
+      </div>
+
+      <!-- Restore Backup -->
+      <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-6">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-950/40 flex items-center justify-center flex-shrink-0">
+            <i class="fa-solid fa-upload text-amber-600 dark:text-amber-400"></i>
+          </div>
+          <div>
+            <h2 class="font-bold text-slate-800 dark:text-slate-100">Restore Backup</h2>
+            <p class="text-xs text-red-500 font-semibold">⚠ Superadmin only — destructive</p>
+          </div>
+        </div>
+        <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">
+          Upload a <code class="text-xs bg-slate-100 dark:bg-slate-800 px-1 rounded">.db</code> backup file to replace the current database. <strong class="text-red-600 dark:text-red-400">All current data will be overwritten.</strong> This cannot be undone.
+        </p>
+        <div class="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-4 mb-4 text-center cursor-pointer hover:border-brand-400 transition-colors" onclick="document.getElementById('backup-file-input').click()">
+          <i class="fa-solid fa-file-arrow-up text-2xl text-slate-300 dark:text-slate-600 mb-2 block"></i>
+          <p id="backup-file-label" class="text-sm text-slate-400">Click to select a .db backup file</p>
+        </div>
+        <input type="file" id="backup-file-input" accept=".db" class="hidden" onchange="handleBackupFileSelect(this)"/>
+        <button onclick="restoreBackup()" id="backup-restore-btn" disabled
+          class="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl transition-colors text-sm">
+          <i class="fa-solid fa-rotate"></i>Restore Database
+        </button>
+        <p id="backup-restore-status" class="text-xs text-slate-400 mt-2 text-center hidden"></p>
+      </div>
+    </div>
+
+    <div class="mt-6 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded-2xl p-4 max-w-3xl">
+      <p class="text-xs text-amber-800 dark:text-amber-300 font-semibold flex items-center gap-2 mb-1"><i class="fa-solid fa-triangle-exclamation"></i>Important notes</p>
+      <ul class="text-xs text-amber-700 dark:text-amber-400 space-y-1 list-disc list-inside">
+        <li>Download a backup before every semester rollover.</li>
+        <li>Restore is only available to superadmin accounts.</li>
+        <li>After restoring, the server continues running with the restored data immediately — no restart needed.</li>
+        <li>Uploaded files are validated as SQLite databases before any changes are made.</li>
+      </ul>
+    </div>
+  </div>
+
 </main>
 
 <!-- POST REVIEW MODAL -->
 <div id="post-review-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+
+<!-- ═══ SEMESTER ROLLOVER CONFIRM MODAL ═══ -->
+<div id="rollover-modal" class="hidden fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+  <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md p-6">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-950/40 flex items-center justify-center flex-shrink-0">
+        <i class="fa-solid fa-rotate text-amber-600 dark:text-amber-400 text-lg"></i>
+      </div>
+      <div>
+        <h3 class="font-display font-bold text-slate-900 dark:text-slate-100">Start New Semester</h3>
+        <p class="text-xs text-red-500 font-semibold">⚠ This will archive all current residents</p>
+      </div>
+    </div>
+
+    <p class="text-sm text-slate-600 dark:text-slate-400 mb-5">
+      All <strong>approved residents</strong> will be moved to the Deleted Archive with the current semester tag.
+      They can be restored for re-enrollment (2nd Semester / Midyear). New settings will take effect immediately.
+    </p>
+
+    <div class="space-y-3 mb-5">
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">New Semester</label>
+        <select id="rollover-semester" class="w-full text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none text-slate-800 dark:text-slate-100">
+          <option>1st Semester</option>
+          <option>2nd Semester</option>
+          <option>Midyear</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">School Year</label>
+        <input type="number" id="rollover-year" min="2020" max="2099" class="w-full text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none text-slate-800 dark:text-slate-100" placeholder="e.g. 2026"/>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">Slip Valid To (new semester)</label>
+        <input type="date" id="rollover-valid-to" class="w-full text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none text-slate-800 dark:text-slate-100"/>
+      </div>
+    </div>
+
+    <div class="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/40 rounded-xl p-3 mb-5">
+      <p class="text-xs text-red-700 dark:text-red-400 font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>All current residents will be archived. Download a backup first if needed.</p>
+    </div>
+
+    <div class="flex gap-3">
+      <button onclick="document.getElementById('rollover-modal').classList.add('hidden')"
+        class="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-semibold text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+        Cancel
+      </button>
+      <button onclick="confirmRollover()"
+        class="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold text-sm transition-colors flex items-center justify-center gap-2" id="rollover-confirm-btn">
+        <i class="fa-solid fa-rotate"></i>Archive &amp; Start New Semester
+      </button>
+    </div>
+  </div>
+</div>
   <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
     <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex-shrink-0">
       <div>
@@ -1350,12 +1501,13 @@
     else if(tab==='ai-log')loadAiModerationLog();
     else if(tab==='posts-pending')loadPendingPosts();
     else if(tab==='posts-all')loadAllPosts();
-    else if(tab==='users')filterUsers(document.getElementById('user-filter')?.value||'');
+    else if(tab==='users'){ loadSemesterSettings(); filterUsers(document.getElementById('user-filter')?.value||''); }
     else if(tab==='logs')loadLogs();
     else if(tab==='dormitory')loadDormRooms();
     else if(tab==='billing'){ initBillingMonth(); loadBilling(); loadGcashSettings(); }
     else if(tab==='maintenance'){ loadMaintenanceStats(); loadMaintenance(); }
     else if(tab==='utility'){ initUtilityMonth(); loadUtility(); loadUtilityChart(); }
+    else if(tab==='backup'){ /* static page, no load needed */ }
   }
 
   // ── Mobile sidebar ────────────────────────────────
@@ -2819,25 +2971,47 @@
 
   function setUserRoleFilter(role) {
     _userRoleFilter = role;
-    // Update pill styles (user = brand blue, admin = purple)
+    const liveTable    = document.getElementById('um-live-table');
+    const deletedTable = document.getElementById('um-deleted-table');
+    // Toggle which table is visible
+    if (role === 'deleted') {
+      liveTable.classList.add('hidden');
+      deletedTable.classList.remove('hidden');
+      loadDeletedUsers();
+    } else {
+      liveTable.classList.remove('hidden');
+      deletedTable.classList.add('hidden');
+    }
+    // Update pill styles
     document.querySelectorAll('.um-role-tab').forEach(btn => {
       const isActive = btn.id === `um-tab-${role}`;
       btn.classList.toggle('active', isActive);
+      // Residents = brand blue
       btn.classList.toggle('border-brand-500',       isActive && role === 'user');
       btn.classList.toggle('bg-brand-50',            isActive && role === 'user');
       btn.classList.toggle('dark:bg-brand-950/40',   isActive && role === 'user');
       btn.classList.toggle('text-brand-700',         isActive && role === 'user');
       btn.classList.toggle('dark:text-brand-300',    isActive && role === 'user');
+      // Admins = purple
       btn.classList.toggle('border-purple-500',      isActive && role === 'admin');
       btn.classList.toggle('bg-purple-50',           isActive && role === 'admin');
       btn.classList.toggle('dark:bg-purple-950/40',  isActive && role === 'admin');
       btn.classList.toggle('text-purple-700',        isActive && role === 'admin');
       btn.classList.toggle('dark:text-purple-300',   isActive && role === 'admin');
+      // Deleted = red
+      btn.classList.toggle('border-red-400',         isActive && role === 'deleted');
+      btn.classList.toggle('bg-red-50',              isActive && role === 'deleted');
+      btn.classList.toggle('dark:bg-red-950/40',     isActive && role === 'deleted');
+      btn.classList.toggle('text-red-600',           isActive && role === 'deleted');
+      btn.classList.toggle('dark:text-red-300',      isActive && role === 'deleted');
+      // Inactive state
       btn.classList.toggle('border-slate-200',       !isActive);
       btn.classList.toggle('dark:border-slate-700',  !isActive);
       btn.classList.toggle('text-slate-500',         !isActive);
     });
-    filterUsers(document.getElementById('user-filter')?.value || '');
+    if (role !== 'deleted') {
+      filterUsers(document.getElementById('user-filter')?.value || '');
+    }
   }
 
   function sortUsers(col) {
@@ -3210,54 +3384,49 @@
   function renderUsers(users){
     const tbody=document.getElementById('users-tbody');
     if(!tbody)return;
-    // Update filter count label
     const countEl = document.getElementById('um-filter-count');
     if(countEl) countEl.textContent = users.length > 0 ? `${users.length} shown` : '';
 
-    if(!users.length){tbody.innerHTML='<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">No users found</td></tr>';return;}
+    if(!users.length){tbody.innerHTML='<tr><td colspan="9" class="px-4 py-8 text-center text-slate-400">No users found</td></tr>';return;}
     tbody.innerHTML=users.map(u=>{
       const av=escHtml(u.avatar||avatarUrl(u.firstName,u.lastName));
       const roleTag=u.role==='admin'?'<span class="badge badge-admin ml-1">Admin</span>':'';
       const activeTag=!u.isActive?'<span class="badge badge-rejected ml-1">Banned</span>':'';
       const rejectedTag=u.accountStatus==='rejected'?'<span class="badge badge-rejected ml-1">Rejected</span>':'';
 
-      // Surname, First M.I. format
       const mi = (u.middleName||'').trim();
       const miStr = mi ? ' ' + mi[0].toUpperCase() + '.' : '';
       const surnameFirst = u.lastName
         ? `${escHtml(u.lastName)}, ${escHtml(u.firstName)}${escHtml(miStr)}`
         : escHtml(fullName(u));
 
-      // Role cell
-      const roleCellTxt = u.role === 'admin' ? 'Admin' : 'Resident';
-      const roleCellCls = u.role === 'admin'
-        ? 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40'
-        : 'text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-950/40';
-      const roleCell = `<span class="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full ${roleCellCls}">${roleCellTxt}</span>`;
-
-      // Reputation display
       const score = u.reputationScore ?? 0;
       const repColor = score > 0 ? 'text-green-600' : score < 0 ? 'text-red-500' : 'text-slate-400';
       const repIcon  = score > 0 ? 'fa-arrow-up' : score < 0 ? 'fa-arrow-down' : 'fa-minus';
       const repCell = `<span class="inline-flex items-center gap-1 text-xs font-bold ${repColor}"><i class="fa-solid ${repIcon} text-[10px]"></i>${score > 0 ? '+' : ''}${score}</span>`;
 
-      // Reports badge
       const rptCount = u.reportCount ?? 0;
       const rptCell = rptCount > 0
         ? `<button onclick="viewUserReports('${u.id}','${escJS(u.username)}')" class="inline-flex items-center gap-1 text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-950 px-2 py-0.5 rounded-lg border border-red-200 dark:border-red-800 transition-colors"><i class="fa-solid fa-flag text-[10px]"></i>${rptCount}</button>`
         : `<span class="text-xs text-slate-300 dark:text-slate-600">—</span>`;
 
-      // Year level
       const yrRaw = u.year_level || u.yearLevel || '';
       const yrCell = yrRaw ? `<span class="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-950/40 px-2 py-0.5 rounded-lg">${escHtml(yrRaw)}</span>` : `<span class="text-xs text-slate-300 dark:text-slate-600">—</span>`;
 
-      // Room number
       const roomStr = u.roomNumber ? `<span class="text-xs font-semibold text-slate-700 dark:text-slate-200">Room ${escHtml(String(u.roomNumber))}${u.bedNumber ? ' · Bed '+escHtml(String(u.bedNumber)):''}</span>` : `<span class="text-xs text-slate-300 dark:text-slate-600">—</span>`;
 
-      // Municipality from permanent address
       const muni = municipalityFrom(u.permanentAddress || u.permanent_address || u.presentAddress || u.present_address || '');
       const muniCell = muni && muni !== '—'
         ? `<span class="text-xs font-semibold text-slate-600 dark:text-slate-300">${escHtml(muni)}</span>`
+        : `<span class="text-xs text-slate-300 dark:text-slate-600">—</span>`;
+
+      // Admission slip button — only for residents (not admins)
+      const slipCell = u.role === 'user'
+        ? `<a href="/api/admin/users/${u.id}/admission-slip" target="_blank"
+             class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950 px-2 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800 transition-colors"
+             title="Download Admission Slip">
+             <i class="fa-solid fa-file-arrow-down text-[10px]"></i>Slip
+           </a>`
         : `<span class="text-xs text-slate-300 dark:text-slate-600">—</span>`;
 
       return `<tr class="border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors" id="user-row-${u.id}">
@@ -3268,6 +3437,7 @@
         <td class="px-4 py-3">${repCell}</td>
         <td class="px-4 py-3">${rptCell}</td>
         <td class="px-4 py-3 text-xs text-slate-400">${reltime(u.createdAt)}</td>
+        <td class="px-4 py-3">${slipCell}</td>
         <td class="px-4 py-3"><div class="flex items-center gap-1 flex-wrap">
           ${!u.idVerified?`<button onclick="verifyUser('${u.id}')" class="text-xs font-medium text-green-600 hover:bg-green-50 dark:hover:bg-green-950 px-2 py-1 rounded-lg transition-colors" title="Verify ID"><i class="fa-solid fa-check mr-1"></i>Verify</button>`:''}
           ${u.isActive&&u.id!==currentUser?.id?`<button data-action="ban" data-uid="${u.id}" data-uname="${surnameFirst}" class="text-xs font-medium text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950 px-2 py-1 rounded-lg transition-colors"><i class="fa-solid fa-ban mr-1"></i>Ban</button>`:''}
@@ -3277,7 +3447,7 @@
         </div></td>
       </tr>
       <tr id="user-review-row-${u.id}" class="hidden border-b-2 border-brand-100 dark:border-brand-900/40" style="overflow:visible">
-        <td colspan="8" class="p-0" style="overflow:visible">
+        <td colspan="9" class="p-0" style="overflow:visible">
           <div class="bg-slate-50 dark:bg-slate-800/50 border-l-4 border-brand-500 px-6 py-5 overflow-visible" id="user-review-panel-${u.id}">
             <div class="flex items-center justify-center py-6"><i class="fa-solid fa-spinner animate-spin text-xl text-slate-300"></i></div>
           </div>
@@ -3386,56 +3556,252 @@
     });
   }
 
-  async function showDeletedUsers(){
-    const panel=document.getElementById('deleted-users-panel');
-    panel.classList.remove('hidden');
-    const tbody=document.getElementById('deleted-users-tbody');
-    tbody.innerHTML='<tr><td colspan="5" class="px-4 py-6 text-center"><div class="inline-block w-5 h-5 border-2 border-red-400 border-t-transparent rounded-full animate-spin"></div></td></tr>';
+  // ── DELETED ARCHIVE ──────────────────────────────────
+  let _allDeletedUsers = []; // cached for semester filter
+
+  async function loadDeletedUsers() {
+    const tbody = document.getElementById('deleted-users-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center"><div class="inline-block w-5 h-5 border-2 border-red-400 border-t-transparent rounded-full animate-spin"></div></td></tr>';
     try {
-      const r=await fetch('/api/admin/users/deleted');
-      const d=await r.json();
-      const users=d.users||[];
-      if(!users.length){tbody.innerHTML='<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">No deleted users in archive.</td></tr>';return;}
-      tbody.innerHTML=users.map(u=>{
-        const fn=[u.first_name,u.last_name].filter(Boolean).join(' ')||'(unknown)';
-        return `<tr class="border-b border-slate-50 dark:border-slate-800 hover:bg-red-50/30 dark:hover:bg-red-950/10">
-          <td class="px-4 py-2.5">
-            <div class="flex items-center gap-2">
-              <img src="${escHtml(avatarUrl(u.first_name,u.last_name))}" class="w-7 h-7 rounded-full flex-shrink-0"/>
-              <div><p class="text-sm font-semibold text-slate-700 dark:text-slate-200">${escHtml(fn)}</p>
-              <p class="text-xs text-slate-400">@${escHtml(u.username||'')}</p></div>
-            </div>
-          </td>
-          <td class="px-4 py-2.5 text-xs text-slate-500">${escHtml(u.email||'')}</td>
-          <td class="px-4 py-2.5"><span class="text-xs font-semibold ${u.role==='admin'?'text-purple-600':'text-slate-500'}">${escHtml(u.role||'user')}</span></td>
-          <td class="px-4 py-2.5 text-xs text-slate-400">${reltime(u.deleted_at)}</td>
-          <td class="px-4 py-2.5 flex gap-1">
-            <button onclick="restoreDeletedUser('${u.id}','${escJS(fn)}')" class="text-xs font-semibold text-blue-600 hover:bg-blue-50 px-2 py-1 rounded-lg border border-blue-200 transition-colors"><i class="fa-solid fa-rotate-left mr-1"></i>Restore</button>
-          </td>
-        </tr>`;
-      }).join('');
-    } catch(e){ tbody.innerHTML=`<tr><td colspan="5" class="px-4 py-6 text-center text-red-400">${escHtml(e.message)}</td></tr>`; }
+      const r = await fetch('/api/admin/users/deleted');
+      const d = await r.json();
+      _allDeletedUsers = d.users || [];
+
+      // Populate semester filter dropdown
+      const filterSel = document.getElementById('deleted-semester-filter');
+      if (filterSel) {
+        const semesters = [...new Set(_allDeletedUsers.map(u => u.semester_tag || '').filter(Boolean))];
+        filterSel.innerHTML = '<option value="">All</option>' +
+          semesters.map(s => `<option value="${escHtml(s)}">${escHtml(s)}</option>`).join('');
+      }
+
+      renderDeletedUsers(_allDeletedUsers);
+    } catch (e) {
+      if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-6 text-center text-red-400">${escHtml(e.message)}</td></tr>`;
+    }
   }
 
-  async function restoreDeletedUser(archiveId,name){
-    showConfirm('Restore User',`Restore "${name}" back as a pending registration?`,async()=>{
-      const r=await fetch(`/api/admin/users/deleted/${archiveId}/restore`,{method:'POST'});
-      const d=await r.json();
-      if(d.error){toast(d.error,'error');return;}
+  function filterDeletedBySemester(semTag) {
+    const filtered = semTag ? _allDeletedUsers.filter(u => (u.semester_tag || '') === semTag) : _allDeletedUsers;
+    renderDeletedUsers(filtered);
+  }
+
+  function renderDeletedUsers(users) {
+    const tbody = document.getElementById('deleted-users-tbody');
+    if (!tbody) return;
+    if (!users.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">No archived users found.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = users.map(u => {
+      const fn = [u.first_name, u.last_name].filter(Boolean).join(' ') || '(unknown)';
+      const semTag = escHtml(u.semester_tag || '—');
+      return `<tr class="border-b border-slate-50 dark:border-slate-800 hover:bg-red-50/30 dark:hover:bg-red-950/10">
+        <td class="px-4 py-2.5">
+          <div class="flex items-center gap-2">
+            <img src="${escHtml(avatarUrl(u.first_name, u.last_name))}" class="w-7 h-7 rounded-full flex-shrink-0"/>
+            <div>
+              <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">${escHtml(fn)}</p>
+              <p class="text-xs text-slate-400">@${escHtml(u.username || '')}</p>
+            </div>
+          </div>
+        </td>
+        <td class="px-4 py-2.5 text-xs text-slate-500">${escHtml(u.email || '')}</td>
+        <td class="px-4 py-2.5">
+          <span class="text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-lg">${semTag}</span>
+        </td>
+        <td class="px-4 py-2.5 text-xs text-slate-400">${reltime(u.deleted_at)}</td>
+        <td class="px-4 py-2.5">
+          <div class="flex gap-1 flex-wrap">
+            <button onclick="restoreDeletedUser('${u.id}','${escJS(fn)}')"
+              class="text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 px-2 py-1 rounded-lg border border-blue-200 dark:border-blue-800 transition-colors">
+              <i class="fa-solid fa-rotate-left mr-1"></i>Restore
+            </button>
+            <button onclick="permanentlyDeleteArchived('${u.id}','${escJS(fn)}')"
+              class="text-xs font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-950 px-2 py-1 rounded-lg border border-red-200 dark:border-red-800 transition-colors">
+              <i class="fa-solid fa-trash mr-1"></i>Purge
+            </button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  async function restoreDeletedUser(archiveId, name) {
+    showConfirm('Restore User', `Restore "${name}" back as a pending registration?`, async () => {
+      const r = await fetch(`/api/admin/users/deleted/${archiveId}/restore`, { method: 'POST' });
+      const d = await r.json();
+      if (d.error) { toast(d.error, 'error'); return; }
       toast(`"${name}" restored to pending registrations ✅`);
-      showDeletedUsers();
+      loadDeletedUsers();
       refreshAll();
     });
   }
 
-  async function permanentlyDeleteArchived(archiveId,name){
-    showConfirm('Purge Permanently',`Permanently remove "${name}" from the archive? This cannot be undone.`,async()=>{
-      const r=await fetch(`/api/admin/users/deleted/${archiveId}`,{method:'DELETE'});
-      const d=await r.json();
-      if(d.error){toast(d.error,'error');return;}
-      toast(`"${name}" purged from archive.`,'info');
-      showDeletedUsers();
+  async function permanentlyDeleteArchived(archiveId, name) {
+    showConfirm('Purge Permanently', `Permanently remove "${name}" from the archive? This cannot be undone.`, async () => {
+      const r = await fetch(`/api/admin/users/deleted/${archiveId}`, { method: 'DELETE' });
+      const d = await r.json();
+      if (d.error) { toast(d.error, 'error'); return; }
+      toast(`"${name}" purged from archive.`, 'info');
+      loadDeletedUsers();
     });
+  }
+
+  // ── SEMESTER SETTINGS ────────────────────────────────
+  async function loadSemesterSettings() {
+    try {
+      const r = await fetch('/api/admin/semester');
+      const d = await r.json();
+      const semSel  = document.getElementById('sem-select');
+      const semYear = document.getElementById('sem-year');
+      const semVT   = document.getElementById('sem-valid-to');
+      if (semSel  && d.currentSemester) semSel.value  = d.currentSemester;
+      if (semYear && d.schoolYear)      semYear.value  = d.schoolYear;
+      if (semVT   && d.slipValidTo)     semVT.value    = d.slipValidTo;
+    } catch (e) { console.error('loadSemesterSettings:', e); }
+  }
+
+  async function saveSemesterSettings() {
+    const semester = document.getElementById('sem-select')?.value;
+    const year     = document.getElementById('sem-year')?.value;
+    const validTo  = document.getElementById('sem-valid-to')?.value;
+    try {
+      const r = await fetch('/api/admin/semester', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentSemester: semester, schoolYear: year, slipValidTo: validTo }),
+      });
+      const d = await r.json();
+      if (d.error) { toast(d.error, 'error'); return; }
+      toast('Semester settings saved ✅');
+    } catch (e) { toast('Failed to save: ' + e.message, 'error'); }
+  }
+
+  function openRolloverModal() {
+    // Pre-fill modal from current bar values
+    const curSem  = document.getElementById('sem-select')?.value;
+    const curYear = document.getElementById('sem-year')?.value;
+    const curVT   = document.getElementById('sem-valid-to')?.value;
+    const rSel  = document.getElementById('rollover-semester');
+    const rYear = document.getElementById('rollover-year');
+    const rVT   = document.getElementById('rollover-valid-to');
+    if (rSel  && curSem)  rSel.value  = curSem;
+    if (rYear && curYear) rYear.value = curYear;
+    if (rVT   && curVT)   rVT.value   = curVT;
+    document.getElementById('rollover-modal').classList.remove('hidden');
+  }
+
+  async function confirmRollover() {
+    const newSemester = document.getElementById('rollover-semester')?.value;
+    const schoolYear  = document.getElementById('rollover-year')?.value;
+    const slipValidTo = document.getElementById('rollover-valid-to')?.value;
+
+    if (!newSemester || !schoolYear) {
+      toast('Please fill in semester and school year.', 'error');
+      return;
+    }
+
+    const btn = document.getElementById('rollover-confirm-btn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin mr-2"></i>Archiving…'; }
+
+    try {
+      const r = await fetch('/api/admin/semester/rollover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newSemester, schoolYear, slipValidTo }),
+      });
+      const d = await r.json();
+      if (d.error) { toast(d.error, 'error'); return; }
+
+      document.getElementById('rollover-modal').classList.add('hidden');
+      // Update the semester control bar to reflect new settings
+      const semSel  = document.getElementById('sem-select');
+      const semYear = document.getElementById('sem-year');
+      const semVT   = document.getElementById('sem-valid-to');
+      if (semSel)  semSel.value  = newSemester;
+      if (semYear) semYear.value = schoolYear;
+      if (semVT)   semVT.value   = slipValidTo || '';
+
+      toast(`✅ New semester started: ${newSemester} SY${schoolYear}. ${d.archived} residents archived.`);
+      refreshAll();
+    } catch (e) {
+      toast('Rollover failed: ' + e.message, 'error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate mr-2"></i>Archive &amp; Start New Semester'; }
+    }
+  }
+
+  // ── BACKUP & RESTORE ─────────────────────────────────
+  async function downloadBackup() {
+    const btn    = document.getElementById('backup-download-btn');
+    const status = document.getElementById('backup-download-status');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin mr-2"></i>Preparing…'; }
+    if (status) { status.textContent = 'Creating backup…'; status.classList.remove('hidden'); }
+    try {
+      const r = await fetch('/api/admin/backup/download');
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error(d.error || r.statusText);
+      }
+      // Trigger browser download
+      const blob = await r.blob();
+      const cd   = r.headers.get('Content-Disposition') || '';
+      const nameMatch = cd.match(/filename="([^"]+)"/);
+      const fileName = nameMatch ? nameMatch[1] : 'damis-backup.db';
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      if (status) status.textContent = `Downloaded: ${fileName}`;
+      toast('Backup downloaded ✅');
+    } catch (e) {
+      if (status) status.textContent = 'Error: ' + e.message;
+      toast('Backup failed: ' + e.message, 'error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-database mr-2"></i>Download .db Backup'; }
+    }
+  }
+
+  let _backupFile = null;
+  function handleBackupFileSelect(input) {
+    _backupFile = input.files[0] || null;
+    const label  = document.getElementById('backup-file-label');
+    const btn    = document.getElementById('backup-restore-btn');
+    if (label) label.textContent = _backupFile ? `Selected: ${_backupFile.name}` : 'Click to select a .db backup file';
+    if (btn)   btn.disabled = !_backupFile;
+  }
+
+  async function restoreBackup() {
+    if (!_backupFile) { toast('No file selected.', 'error'); return; }
+    showConfirm('Restore Database',
+      `⚠ This will REPLACE the entire database with "${_backupFile.name}". All current data will be overwritten. This cannot be undone. Are you sure?`,
+      async () => {
+        const btn    = document.getElementById('backup-restore-btn');
+        const status = document.getElementById('backup-restore-status');
+        if (btn)    { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin mr-2"></i>Restoring…'; }
+        if (status) { status.textContent = 'Uploading and restoring…'; status.classList.remove('hidden'); }
+        try {
+          const form = new FormData();
+          form.append('backup', _backupFile);
+          const r = await fetch('/api/admin/backup/restore', { method: 'POST', body: form });
+          const d = await r.json();
+          if (!r.ok || d.error) throw new Error(d.error || r.statusText);
+          if (status) status.textContent = 'Restored successfully. Refreshing…';
+          toast('Database restored ✅ Reloading in 3s…');
+          setTimeout(() => location.reload(), 3000);
+        } catch (e) {
+          if (status) status.textContent = 'Error: ' + e.message;
+          toast('Restore failed: ' + e.message, 'error');
+          if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate mr-2"></i>Restore Database'; }
+        }
+      }
+    );
   }
 
   // ── REGISTRATION SUB-TABS ────────────────────────

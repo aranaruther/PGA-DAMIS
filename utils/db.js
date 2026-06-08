@@ -1866,6 +1866,17 @@ migrate(`ALTER TABLE dorm_billing ADD COLUMN receipt_url TEXT DEFAULT ''`);
 // Utility bill scan / proof-of-billing image
 migrate(`ALTER TABLE utility_bills ADD COLUMN image_url TEXT DEFAULT ''`);
 
+// ── v3 semester / admission slip migrations ────────────────────────────────────
+// Semester tag on deleted_users so we can filter by semester for re-enrollment
+migrate(`ALTER TABLE deleted_users ADD COLUMN semester_tag TEXT DEFAULT ''`);
+// Per-user admission slip serial counter (reset each semester rollover)
+migrate(`ALTER TABLE users ADD COLUMN admission_no TEXT DEFAULT ''`);
+// Seed default app_settings for semester management (only if not already set)
+db.prepare(`INSERT OR IGNORE INTO app_settings (key, value) VALUES ('current_semester', '1st Semester')`).run();
+db.prepare(`INSERT OR IGNORE INTO app_settings (key, value) VALUES ('school_year', '${new Date().getFullYear()}')`).run();
+db.prepare(`INSERT OR IGNORE INTO app_settings (key, value) VALUES ('slip_valid_to', '')`).run();
+db.prepare(`INSERT OR IGNORE INTO app_settings (key, value) VALUES ('admission_counter', '0')`).run();
+
 
 function createMaintenanceRequest({ userId, category, title, description, location, priority, imageUrl = '' }) {
   const id = genId();
@@ -1979,6 +1990,87 @@ function getUtilityTrend(months = 12) {
     ORDER BY month DESC, type ASC LIMIT ?`).all(months * 2);
 }
 
+// ── Admission Slip helpers ─────────────────────────────────────────────────────
+
+/**
+ * Atomically increment admission_counter and return the new zero-padded number.
+ * Stored in app_settings so it survives restarts and resets cleanly each semester.
+ */
+function nextAdmissionNo() {
+  const current = parseInt(getSetting('admission_counter', '0'), 10) || 0;
+  const next    = current + 1;
+  setSetting('admission_counter', String(next));
+  return String(next).padStart(4, '0');
+}
+
+/**
+ * Semester rollover: archive all current approved residents to deleted_users,
+ * reset the admission counter, and update the semester setting.
+ * Called by the admin "New Semester" action.
+ * Returns { archived, skipped } counts.
+ */
+function semesterRollover(newSemester, schoolYear, newSlipValidTo, adminId) {
+  const { randomUUID } = require('crypto');
+  const semesterTag = `${newSemester} ${schoolYear}`;
+  const residents = db.prepare(
+    `SELECT u.*, ivr.id_front_url, ivr.id_back_url, ivr.selfie_url,
+      ivr.cert_residency_url, ivr.cert_low_income_url, ivr.cert_enrollment_url
+     FROM users u
+     LEFT JOIN id_verification_requests ivr ON ivr.user_id = u.id
+       AND ivr.id = (SELECT id FROM id_verification_requests WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1)
+     WHERE u.account_status = 'approved' AND u.role = 'user'`
+  ).all();
+
+  let archived = 0, skipped = 0;
+
+  const insertArchive = db.prepare(`
+    INSERT OR IGNORE INTO deleted_users
+      (id, original_id, first_name, middle_name, last_name, suffix, username, email, phone,
+       birthday, sex, civil_status, bio, location, avatar, auth_provider, role,
+       present_address, permanent_address, school_name, course, year_level, school_address,
+       father_info, mother_info, monthly_income,
+       id_front_url, id_back_url, selfie_url,
+       cert_residency_url, cert_low_income_url, cert_enrollment_url,
+       original_created_at, deleted_by, semester_tag)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `);
+
+  db.transaction(() => {
+    for (const u of residents) {
+      try {
+        insertArchive.run(
+          randomUUID(), u.id,
+          u.first_name, u.middle_name || '', u.last_name, u.suffix || '',
+          u.username, u.email, u.phone || '',
+          u.birthday || '', u.sex || '', u.civil_status || '', u.bio || '', u.location || '',
+          u.avatar || '', u.auth_provider || 'local', u.role || 'user',
+          u.present_address || '', u.permanent_address || '',
+          u.school_name || '', u.course || '', u.year_level || '', u.school_address || '',
+          u.father_info || '', u.mother_info || '', u.monthly_income || '',
+          u.id_front_url || '', u.id_back_url || '', u.selfie_url || '',
+          u.cert_residency_url || '', u.cert_low_income_url || '', u.cert_enrollment_url || '',
+          u.created_at || '', adminId, semesterTag
+        );
+        // Clear FK-constrained rows, then hard-delete
+        db.prepare('DELETE FROM bed_assignments WHERE user_id = ?').run(u.id);
+        db.prepare('DELETE FROM dorm_billing WHERE user_id = ?').run(u.id);
+        db.prepare('DELETE FROM users WHERE id = ?').run(u.id);
+        archived++;
+      } catch (e) {
+        skipped++;
+      }
+    }
+  })();
+
+  // Update settings for new semester
+  setSetting('current_semester', newSemester);
+  setSetting('school_year', String(schoolYear));
+  setSetting('slip_valid_to', newSlipValidTo || '');
+  setSetting('admission_counter', '0'); // reset counter for new semester
+
+  return { archived, skipped };
+}
+
 module.exports = {
   db, genId,
   // User
@@ -2037,4 +2129,6 @@ module.exports = {
   upsertUtilityBill, getUtilityBills, getUtilityTrend,
   // GCash / billing receipts
   setBillReceipt, clearBillReceipt,
+  // Admission Slip / Semester
+  nextAdmissionNo, semesterRollover,
 };

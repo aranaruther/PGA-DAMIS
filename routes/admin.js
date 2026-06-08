@@ -26,6 +26,7 @@ const {
   getReputationScore,
   createMaintenanceRequest, getMaintenanceRequests, updateMaintenanceRequest, getMaintenanceStats,
   upsertUtilityBill, getUtilityBills, getUtilityTrend,
+  nextAdmissionNo, semesterRollover,
 } = require('../utils/db');
 const { sendAccountApprovedEmail, sendAccountRejectedEmail } = require('../utils/emailService');
 const { multerUpload, toCloudinary, resizeImage, hasCloudinary } = require('../middleware/upload');
@@ -1640,6 +1641,271 @@ router.get('/api/admin/export/maintenance', requireAdmin, (req, res) => {
     res.json(rows);
   } catch (err) { send500(res, err); }
 });
+
+// ══════════════════════════════════════════════════════════════════
+// SEMESTER MANAGEMENT
+// ══════════════════════════════════════════════════════════════════
+
+/** GET /api/admin/semester — return current semester settings */
+router.get('/api/admin/semester', requireAdmin, (req, res) => {
+  res.json({
+    currentSemester: getSetting('current_semester', '1st Semester'),
+    schoolYear:      getSetting('school_year', String(new Date().getFullYear())),
+    slipValidTo:     getSetting('slip_valid_to', ''),
+  });
+});
+
+/** PUT /api/admin/semester — update semester display settings (no rollover) */
+router.put('/api/admin/semester', requireAdmin, (req, res) => {
+  try {
+    const { currentSemester, schoolYear, slipValidTo } = req.body;
+    if (currentSemester) setSetting('current_semester', currentSemester);
+    if (schoolYear)      setSetting('school_year', String(schoolYear));
+    if (slipValidTo !== undefined) setSetting('slip_valid_to', slipValidTo);
+    logAdminAction(req.user.id, 'semester_updated', 'system', null,
+      `${getSetting('current_semester')} SY${getSetting('school_year')} validTo=${slipValidTo}`);
+    log.admin(`📅 Semester updated → ${getSetting('current_semester')} SY${getSetting('school_year')} by @${req.user.username}`);
+    res.json({ success: true });
+  } catch (err) { send500(res, err); }
+});
+
+/**
+ * POST /api/admin/semester/rollover
+ * Archives all current residents to deleted_users with semester_tag,
+ * resets admission counter, and updates semester settings.
+ * Body: { newSemester, schoolYear, slipValidTo }
+ */
+router.post('/api/admin/semester/rollover', requireAdmin, (req, res) => {
+  try {
+    const { newSemester, schoolYear, slipValidTo } = req.body;
+    if (!newSemester || !schoolYear) return res.status(400).json({ error: 'newSemester and schoolYear are required.' });
+    const result = semesterRollover(newSemester, schoolYear, slipValidTo || '', req.user.id);
+    logAdminAction(req.user.id, 'semester_rollover', 'system', null,
+      `${newSemester} SY${schoolYear} — archived ${result.archived} residents`);
+    log.admin(`🔄 SEMESTER ROLLOVER → ${newSemester} SY${schoolYear} | archived=${result.archived} skipped=${result.skipped} — by @${req.user.username}`);
+    res.json({ success: true, ...result, newSemester, schoolYear });
+  } catch (err) { send500(res, err); }
+});
+
+// ══════════════════════════════════════════════════════════════════
+// ADMISSION SLIP — server-side XLSX generation
+// ══════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/admin/users/:id/admission-slip
+ * Fills the Admission_Slip_Template.xlsx with resident data and
+ * streams it as a downloadable file.
+ * Uses exceljs to load the template, replace formula cells with
+ * computed values, and write to an in-memory buffer.
+ */
+router.get('/api/admin/users/:id/admission-slip', requireAdmin, async (req, res) => {
+  try {
+    const ExcelJS = require('exceljs');
+    const path    = require('path');
+
+    const userId = req.params.id;
+    // Fetch full resident data
+    const row = db.prepare(`
+      SELECT u.*,
+        dr.room_number, ba.bed_number
+      FROM users u
+      LEFT JOIN bed_assignments ba ON ba.user_id = u.id
+      LEFT JOIN dorm_rooms dr ON dr.id = ba.room_id
+      WHERE u.id = ?
+    `).get(userId);
+
+    if (!row) return res.status(404).json({ error: 'Resident not found.' });
+
+    // Get or assign admission number for this resident+semester
+    let admissionNo = (row.admission_no || '').trim();
+    if (!admissionNo) {
+      admissionNo = nextAdmissionNo();
+      db.prepare("UPDATE users SET admission_no = ? WHERE id = ?").run(admissionNo, userId);
+    }
+
+    const semester   = getSetting('current_semester', '1st Semester');
+    const schoolYear = getSetting('school_year', String(new Date().getFullYear()));
+    const slipValidTo = getSetting('slip_valid_to', '');
+
+    // Parse address — use permanent_address, fallback present_address
+    const address = (row.permanent_address || row.present_address || '').trim();
+
+    // ECN: Emergency Contact Number — use father_info or mother_info (first phone-like substring)
+    const ecnRaw = (row.father_info || row.mother_info || '').trim();
+    const ecnMatch = ecnRaw.match(/[\d\s\-+()]{7,}/);
+    const ecn = ecnMatch ? ecnMatch[0].trim() : ecnRaw.slice(0, 30);
+
+    const slipDate = new Date();
+    const dateStr  = slipDate.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+    const validToStr = slipValidTo
+      ? new Date(slipValidTo).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
+      : '';
+
+    const roomStr = row.room_number ? String(row.room_number) : '—';
+
+    // Load template
+    const templatePath = path.join(__dirname, '..', 'assets', 'Admission_Slip_Template.xlsx');
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.readFile(templatePath);
+    const ws = wb.getWorksheet(1);
+
+    /**
+     * Fill both halves of the slip (rows 11-27 = management copy, rows 43-59 = resident copy).
+     * Clears cross-workbook formulas and writes computed string values.
+     */
+    function fillSlip(dateRow, semesterRow, schoolYearRow, validToRow,
+                      familyRow, firstRow, middleRow, addrRow, contactRow, ecnRow,
+                      admNoCol, roomNoCol, dateSignRow1, dateSignRow2) {
+      const setVal = (rowNum, colNum, val) => {
+        const cell = ws.getCell(rowNum, colNum);
+        cell.value = val;  // clears any formula
+      };
+
+      // Date (col B=2)
+      setVal(dateRow, 2, dateStr);
+      // Admission No. (col F=6)
+      setVal(dateRow, 6, admissionNo);
+      // Semester (col B=2 of semesterRow)
+      setVal(semesterRow, 2, semester);
+      // Room No. (col F=6)
+      setVal(semesterRow, 6, roomStr);
+      // School Year
+      setVal(schoolYearRow, 2, parseInt(schoolYear, 10) || new Date().getFullYear());
+      // Valid from / to
+      setVal(validToRow, 2, dateStr);
+      setVal(validToRow, 4, validToStr);
+      // Personal info
+      setVal(familyRow,  2, row.last_name  || '');
+      setVal(familyRow,  5, address);
+      setVal(firstRow,   2, row.first_name || '');
+      setVal(firstRow,   5, row.phone      || '');
+      setVal(middleRow,  2, row.middle_name || '');
+      setVal(middleRow,  5, ecn);
+      // Signature date lines
+      setVal(dateSignRow1, 1, dateStr);
+      setVal(dateSignRow1, 3, dateStr);
+      setVal(dateSignRow2, 1, dateStr);
+      setVal(dateSignRow2, 3, dateStr);
+    }
+
+    // Management copy: rows 11,12,13,14, 16,17,18, 26,26
+    fillSlip(11, 12, 13, 14,  16, 17, 18,  16, 17, 18,  6, 6,  26, 26);
+    // Resident copy: rows 43,44,45,46, 48,49,50, 58,58
+    fillSlip(43, 44, 45, 46,  48, 49, 50,  48, 49, 50,  6, 6,  58, 58);
+
+    // Stream as download
+    const safeName = `${(row.last_name||'').replace(/\s+/g,'_')}_AdmissionSlip.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
+
+    await wb.xlsx.write(res);
+    res.end();
+
+    logAdminAction(req.user.id, 'admission_slip_generated', 'user', userId,
+      `@${row.username} — slip #${admissionNo} ${semester} SY${schoolYear}`);
+    log.admin(`📄 Admission slip generated for @${row.username} #${admissionNo} — by @${req.user.username}`);
+  } catch (err) { send500(res, err); }
+});
+
+// ══════════════════════════════════════════════════════════════════
+// BACKUP & RESTORE
+// ══════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/admin/backup/download
+ * Uses better-sqlite3's built-in .backup() to create a consistent
+ * hot backup of the live DB and streams it as a .db file download.
+ * Safe to run while the app is serving requests (WAL checkpoint included).
+ */
+router.get('/api/admin/backup/download', requireAdmin, async (req, res) => {
+  try {
+    const path = require('path');
+    const os   = require('os');
+    const fs   = require('fs');
+
+    const timestamp   = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const backupName  = `damis-backup-${timestamp}.db`;
+    const backupPath  = path.join(os.tmpdir(), backupName);
+
+    // better-sqlite3 async backup — consistent even under write load
+    await db.backup(backupPath);
+
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${backupName}"`);
+    const stream = fs.createReadStream(backupPath);
+    stream.pipe(res);
+    stream.on('end', () => {
+      fs.unlink(backupPath, () => {}); // clean up temp file
+    });
+    stream.on('error', (e) => { send500(res, e, 'backup stream'); });
+
+    logAdminAction(req.user.id, 'db_backup_downloaded', 'system', null, backupName);
+    log.admin(`💾 DB backup downloaded: ${backupName} — by @${req.user.username}`);
+  } catch (err) { send500(res, err); }
+});
+
+/**
+ * POST /api/admin/backup/restore
+ * Accepts a .db file upload, validates it is a SQLite database,
+ * then replaces the live DB using SQLite's restore pattern.
+ * ⚠ This is destructive — the current DB is replaced.
+ * Requires superadmin role for extra safety.
+ */
+router.post('/api/admin/backup/restore',
+  requireAdmin,
+  multerUpload.single('backup'),
+  async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: 'No backup file uploaded.' });
+      // Only superadmin can restore
+      if (req.user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Only superadmin can restore a backup.' });
+      }
+
+      const path = require('path');
+      const os   = require('os');
+      const fs   = require('fs');
+      const Database = require('better-sqlite3');
+
+      // Validate magic bytes: SQLite files start with "SQLite format 3\000"
+      const magic = req.file.buffer.slice(0, 16).toString('ascii');
+      if (!magic.startsWith('SQLite format 3')) {
+        return res.status(400).json({ error: 'Uploaded file is not a valid SQLite database.' });
+      }
+
+      // Write uploaded buffer to a temp file
+      const tmpPath = path.join(os.tmpdir(), `damis-restore-${Date.now()}.db`);
+      fs.writeFileSync(tmpPath, req.file.buffer);
+
+      // Validate the uploaded DB can be opened
+      let uploadedDb;
+      try {
+        uploadedDb = new Database(tmpPath, { readonly: true });
+        // Quick sanity: must have a users table
+        uploadedDb.prepare("SELECT COUNT(*) FROM users").get();
+        uploadedDb.close();
+      } catch (e) {
+        fs.unlink(tmpPath, () => {});
+        return res.status(400).json({ error: `Backup file appears corrupt: ${e.message}` });
+      }
+
+      // Get the live DB path
+      const DATA_DIR  = process.env.DATA_DIR || path.join(__dirname, '..');
+      const liveDbPath = path.join(DATA_DIR, 'connecthub.db');
+
+      // Use better-sqlite3 restore: open the uploaded DB and backup INTO the live DB
+      // This is safe because .backup() copies page-by-page with WAL checkpoints
+      const srcDb = new Database(tmpPath, { readonly: true });
+      await srcDb.backup(liveDbPath);
+      srcDb.close();
+      fs.unlink(tmpPath, () => {});
+
+      log.admin(`♻ DB RESTORED from backup — by @${req.user.username}`);
+      // Note: we don't logAdminAction here because the log table was just replaced
+      res.json({ success: true, message: 'Database restored. The server will continue running with the restored data.' });
+    } catch (err) { send500(res, err); }
+  }
+);
 
 
 module.exports = router;
