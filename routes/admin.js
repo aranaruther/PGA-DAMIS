@@ -31,6 +31,13 @@ const {
 const { sendAccountApprovedEmail, sendAccountRejectedEmail } = require('../utils/emailService');
 const { multerUpload, toCloudinary, resizeImage, hasCloudinary } = require('../middleware/upload');
 
+// Dedicated multer for .db backup file uploads — no image filter, memory storage only
+const multer = require('multer');
+const backupUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 500 * 1024 * 1024 }, // 500 MB max backup size
+});
+
 // trackAiRequest / markAiRateLimited are now handled by geminiPool
 function trackAiRequest(key) { if(key) geminiPool.trackRequest(key); }
 function markAiRateLimited(status, errBody, key) {
@@ -1727,13 +1734,45 @@ router.get('/api/admin/users/:id/admission-slip', requireAdmin, async (req, res)
     const schoolYear = getSetting('school_year', String(new Date().getFullYear()));
     const slipValidTo = getSetting('slip_valid_to', '');
 
-    // Parse address — use permanent_address, fallback present_address
-    const address = (row.permanent_address || row.present_address || '').trim();
+    // Address — extract just "Municipality, Province" from the full stored address string
+    // Stored format: "Barangay, City/Municipality, Province, Region, Philippines"
+    // We want the 2nd and 3rd comma-separated parts (index 1 and 2)
+    const rawAddr = (row.permanent_address || row.present_address || '').trim();
+    let address = rawAddr;
+    if (rawAddr) {
+      const parts = rawAddr.split(',').map(p => p.trim()).filter(Boolean);
+      // parts[0]=barangay, parts[1]=city/municipality, parts[2]=province, parts[3]=region
+      if (parts.length >= 3) {
+        address = `${parts[1]}, ${parts[2]}`;
+      } else if (parts.length === 2) {
+        address = `${parts[0]}, ${parts[1]}`;
+      } else {
+        address = rawAddr;
+      }
+    }
 
-    // ECN: Emergency Contact Number — use father_info or mother_info (first phone-like substring)
-    const ecnRaw = (row.father_info || row.mother_info || '').trim();
-    const ecnMatch = ecnRaw.match(/[\d\s\-+()]{7,}/);
-    const ecn = ecnMatch ? ecnMatch[0].trim() : ecnRaw.slice(0, 30);
+    // ECN: father and/or mother phone from JSON-encoded info fields
+    // Stored as JSON: {"firstName":"...","lastName":"...","phone":"9171234567",...}
+    function extractPhone(jsonStr) {
+      if (!jsonStr) return '';
+      try {
+        const obj = JSON.parse(jsonStr);
+        const raw = (obj.phone || '').toString().replace(/\D/g, '');
+        if (!raw) return '';
+        // Normalise to +63XXXXXXXXXX format
+        return raw.startsWith('63') ? '+' + raw
+          : raw.startsWith('0')    ? '+63' + raw.slice(1)
+          : raw.length === 10      ? '+63' + raw
+          : raw;
+      } catch (_) {
+        // Not JSON — try to extract a phone number substring
+        const m = jsonStr.match(/[\d\s\-+()]{7,}/);
+        return m ? m[0].trim() : jsonStr.slice(0, 20);
+      }
+    }
+    const fatherPhone = extractPhone(row.father_info);
+    const motherPhone = extractPhone(row.mother_info);
+    const ecn = [fatherPhone, motherPhone].filter(Boolean).join(' / ') || '—';
 
     const slipDate = new Date();
     const dateStr  = slipDate.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -1849,18 +1888,15 @@ router.get('/api/admin/backup/download', requireAdmin, async (req, res) => {
  * Accepts a .db file upload, validates it is a SQLite database,
  * then replaces the live DB using SQLite's restore pattern.
  * ⚠ This is destructive — the current DB is replaced.
- * Requires superadmin role for extra safety.
+ * Requires admin role.
  */
 router.post('/api/admin/backup/restore',
   requireAdmin,
-  multerUpload.single('backup'),
+  backupUpload.single('backup'),
   async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: 'No backup file uploaded.' });
-      // Only superadmin can restore
-      if (req.user.role !== 'superadmin') {
-        return res.status(403).json({ error: 'Only superadmin can restore a backup.' });
-      }
+      // Any admin can restore (superadmin role not required)
 
       const path = require('path');
       const os   = require('os');
